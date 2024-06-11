@@ -12,7 +12,7 @@ export const test = (req, res) => {
 export const signin = async (req, res, next) => {
   const { username, password } = req.body;
 
-  if (!username || !password || username === "" || password === "") {
+  if (!username || !password || password === "") {
     return next(errorHandler(404, "All fields are required!"));
   }
 
