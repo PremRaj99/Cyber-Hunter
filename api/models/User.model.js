@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema(
       type: Number,
       require: true,
       unique: true,
+      max: 8,
     },
     email: {
       type: String,
