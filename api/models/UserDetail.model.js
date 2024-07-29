@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       require: true,
     },
+    qId: {
+      type: String,
+      require: true,
+      unique: true,
+    },
     userId: {
       type: String,
       require: true,
@@ -32,7 +37,7 @@ const userSchema = new mongoose.Schema(
       default:
         "https://static-00.iconduck.com/assets.00/profile-circle-icon-512x512-zxne30hp.png",
     },
-    Intrest: {
+    interestId: {
       type: Array,
       default: [],
     },
@@ -40,8 +45,14 @@ const userSchema = new mongoose.Schema(
       type: Number,
       require: true,
       maxLength: 10,
+      required: true
     },
-    TeamId: {
+    gender: {
+      type: String,
+      required: true,
+      enum: ["male", "female", "others"]
+    },
+    teamId: {
       type: String,
       default: null,
     },

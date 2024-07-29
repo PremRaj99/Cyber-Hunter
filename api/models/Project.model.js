@@ -4,17 +4,16 @@ const projectSchema = new mongoose.Schema(
   {
     userId: {
         type: String,
-        unique : true
     },
     teamId: {
         type: String,
-        unique : true
     },
     projectName: {
         type: String,
+        required: true
     },
     projectDescription: {
-        type: String,
+        type: String, 
     },
     projectThumbnail: {
         type: String,
@@ -55,7 +54,7 @@ const projectSchema = new mongoose.Schema(
         type: Array,
         default: [],
     },
-    batchId: {
+    badgeId: {
         type: Array,
         default: [],
     },

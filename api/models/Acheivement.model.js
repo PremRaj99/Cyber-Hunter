@@ -27,7 +27,7 @@ const acheivementSchema = new mongoose.Schema(
         type: Number,
         default: 0,
     },
-    batchId: {
+    badgeId: {
         type: Array,
         default: [],
     },

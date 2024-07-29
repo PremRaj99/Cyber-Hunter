@@ -2,6 +2,8 @@ import User from "../models/User.model.js";
 import bcryptjs from "bcryptjs";
 import { errorHandler } from "../utils/error.js";
 import jwt from "jsonwebtoken";
+import generateTokenAndSetCookie from "../utils/generateToken.js";
+import UserDetail from "../models/UserDetail.model.js";
 
 export const test = (req, res) => {
   res.json({
@@ -9,78 +11,82 @@ export const test = (req, res) => {
   });
 };
 
-export const signin = async (req, res, next) => {
-  const { username, password } = req.body;
+export const login = async (req, res, next) => {
+  const { email, password } = req.body;
 
-  if (!username || !password || password === "") {
+  if (!email || !password || password === "") {
     return next(errorHandler(404, "All fields are required!"));
   }
 
   try {
-    const validUsername = await User.findOne({ username: username });
+    const validEmail = await User.findOne({ email: email });
 
-    if (!validUsername) {
+    if (!validEmail) {
       return next(errorHandler(404, "User Not Found"));
     }
     const validPassword = bcryptjs.compareSync(
       password,
-      validUsername.password
+      validEmail.password
     );
     if (!validPassword) {
       return next(errorHandler(401, "Invalid Password"));
     }
-    const token = jwt.sign(
-      { id: validUsername._id, role: validUsername.role },
-      process.env.JWT_SECRET
-    );
+    generateTokenAndSetCookie(validEmail._id, res, validEmail.role);
 
-    const { password: pass, ...rest } = validUsername._doc;
+    const { password: pass, ...rest } = validEmail._doc;
+    const userDetail = await UserDetail.findOne({ userId: req.user.id });
 
-    res
-      .status(200)
-      .cookie("access_token", token, {
-        httpOnly: true,
-      })
-      .json(rest);
+    if (!userDetail) {
+      return res.status(200).json(rest);
+    }
+    const data = {
+      ...rest,
+      name: userDetail.name,
+      course: userDetail.course,
+      session: userDetail.session,
+      branch: userDetail.branch,
+      profilePicture: userDetail.profilePicture,
+      DOB: userDetail.DOB,
+      phoneNumber: userDetail.phoneNumber,
+      gender: userDetail.gender,
+      teamId: userDetail.teamId,
+    };
+
+    res.status(200).json(data);
   } catch (error) {
     next(error);
   }
 };
 
 export const signup = async (req, res, next) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password || password === "") {
+  const { email, confirmPassword, password } = req.body;
+  if (!email || !password || password === "" || !confirmPassword) {
     return next(errorHandler(404, "All fields are required!"));
   }
+  if(confirmPassword !== password) {
+    return next(errorHandler(404, "Password donot match!"));
+  }
   try {
-    const validUsername = await User.findOne({ username: username });
-    if (validUsername) {
-      return next(errorHandler(409, "Username already exists"));
+    const validEmail = await User.findOne({ email: email });
+    if (validEmail) {
+      return next(errorHandler(409, "Email already exists"));
     }
     const salt = bcryptjs.genSaltSync(10);
     const hashedPassword = bcryptjs.hashSync(password, salt);
 
-    const user = new User({ username, email, password: hashedPassword });
+    const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    const token = jwt.sign(
-      { id: validUsername._id, role: validUsername.role },
-      process.env.JWT_SECRET
-    );
+    generateTokenAndSetCookie(validEmail._id, res, validEmail.role);
 
     const { password: pass, ...rest } = user._doc;
-    res
-      .status(200)
-      .cookie("access_token", token, {
-        httpOnly: true,
-      })
-      .json(rest);
+    res.status(200).json(rest);
   } catch (error) {
     next(error);
   }
 };
 
-export const signout = async (req, res, next) => {
+export const logout = async (req, res, next) => {
   res.clearCookie("access_token", { path: "/" });
   res.json({ message: "Logged Out Successfully!" });
 };

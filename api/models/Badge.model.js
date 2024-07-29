@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const batchSchema = new mongoose.Schema(
+const badgeSchema = new mongoose.Schema(
   {
     userId: {
       type: String,
@@ -30,6 +30,6 @@ const batchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Batch = mongoose.model("Batch", batchSchema);
+const Badge = mongoose.model("Badge", badgeSchema);
 
-export default Batch;
+export default Badge;

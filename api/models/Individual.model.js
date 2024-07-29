@@ -28,7 +28,7 @@ const individualSchema = new mongoose.Schema(
           type: Array,
           default: [],
       },
-      batchId: {
+      badgeId: {
           type: Array,
           default: [],
       }
