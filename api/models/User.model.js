@@ -13,7 +13,9 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-    }
+      default: "user",
+      emum: ["user", "moderator", "admin"],
+    },
   },
   { timestamps: true }
 );

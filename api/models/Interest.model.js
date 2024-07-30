@@ -2,11 +2,7 @@ import mongoose from "mongoose";
 
 const InterestSchema = new mongoose.Schema(
   {
-    userId: {
-      type: String,
-      require: true,
-    },
-    interestName: {
+    content: {
         type: String,
         require: true,
     },

@@ -2,19 +2,7 @@ import mongoose from "mongoose";
 
 const tagSchema = new mongoose.Schema(
   {
-    userId: {
-      type: String,
-      require: true,
-    },
     content: {
-        type: String,
-        require: true,
-    },
-    description: {
-        type: String,
-        require: true,
-    },
-    category: {
         type: String,
         require: true,
     },
@@ -24,4 +12,4 @@ const tagSchema = new mongoose.Schema(
 
 const Tag = mongoose.model("Tag", tagSchema);
 
-export default Teg;
+export default Tag;

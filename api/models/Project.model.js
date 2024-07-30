@@ -12,15 +12,23 @@ const projectSchema = new mongoose.Schema(
         type: String,
         required: true
     },
+    projectImage: {
+        type: Array,
+        default: [],
+    },
+    gitHubLink: {
+        type: String,
+        required: true,
+    },
+    liveLink: {
+        type: String,
+    },
     projectDescription: {
         type: String, 
     },
     projectThumbnail: {
         type: String,
-    },
-    projectIamge: {
-        type: Array,
-        default: [],
+        required: true,
     },
     tagId: {
         type: Array,
@@ -61,6 +69,7 @@ const projectSchema = new mongoose.Schema(
     status: {
         type: String,
         default: "pending",
+        enum: ["pending", "active"]
     },
   },
   { timestamps: true }
