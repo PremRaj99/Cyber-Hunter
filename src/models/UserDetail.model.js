@@ -43,8 +43,12 @@ const userSchema = new mongoose.Schema(
     },
     phoneNumber: {
       type: Number,
-      require: true,
-      maxLength: 10,
+      validate: {
+        validator: function (v) {
+          return /^[0-9]{10}$/.test(v);
+        },
+        message: "Invalid Phone Number",
+      },
       required: true
     },
     gender: {

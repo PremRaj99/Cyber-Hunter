@@ -4,11 +4,28 @@ import { errorHandler } from "../utils/error.js";
 import jwt from "jsonwebtoken";
 import generateTokenAndSetCookie from "../utils/generateToken.js";
 import UserDetail from "../models/UserDetail.model.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const test = (req, res) => {
   res.json({
     message: "API is Running...",
   });
+};
+
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save();
+    return { accessToken, refreshToken };
+  } catch (error) {
+    next(
+      errorHandler(500, "Something went wrong while generating refresh token")
+    );
+  }
 };
 
 export const login = async (req, res, next) => {
@@ -24,23 +41,23 @@ export const login = async (req, res, next) => {
     if (!validEmail) {
       return next(errorHandler(404, "User Not Found"));
     }
-    const validPassword = bcryptjs.compareSync(
-      password,
-      validEmail.password
-    );
+    const validPassword = bcryptjs.compareSync(password, validEmail.password);
     if (!validPassword) {
       return next(errorHandler(401, "Invalid Password"));
     }
-    generateTokenAndSetCookie(validEmail._id, res, validEmail.role);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      validEmail._id
+    );
 
     const { password: pass, ...rest } = validEmail._doc;
-    const userDetail = await UserDetail.findOne({ userId: req.user.id });
+    const userDetail = await UserDetail.findOne({ userId: validEmail._id });
 
     if (!userDetail) {
       return res.status(200).json(rest);
     }
     const data = {
       ...rest,
+      accessToken,
       name: userDetail.name,
       course: userDetail.course,
       session: userDetail.session,
@@ -52,7 +69,11 @@ export const login = async (req, res, next) => {
       teamId: userDetail.teamId,
     };
 
-    res.status(200).json(data);
+    res
+      .status(200)
+      .cookie("accessToken", accessToken)
+      .cookie("refreshToken", refreshToken)
+      .json(ApiResponse(200, data, "Login Successful"));
   } catch (error) {
     next(error);
   }
@@ -63,7 +84,7 @@ export const signup = async (req, res, next) => {
   if (!email || !password || password === "" || !confirmPassword) {
     return next(errorHandler(404, "All fields are required!"));
   }
-  if(confirmPassword !== password) {
+  if (confirmPassword !== password) {
     return next(errorHandler(404, "Password donot match!"));
   }
   try {
@@ -77,7 +98,7 @@ export const signup = async (req, res, next) => {
     const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    generateTokenAndSetCookie(validEmail._id, res, validEmail.role);
+    generateTokenAndSetCookie(user._id, res, user.role);
 
     const { password: pass, ...rest } = user._doc;
     res.status(200).json(rest);
@@ -87,6 +108,24 @@ export const signup = async (req, res, next) => {
 };
 
 export const logout = async (req, res, next) => {
-  res.clearCookie("access_token", { path: "/" });
-  res.json({ message: "Logged Out Successfully!" });
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  res
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(ApiResponse(200, {}, "Logout Successful"));
 };

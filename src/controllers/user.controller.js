@@ -34,15 +34,14 @@ export const createUserDetail = async (req, res, next) => {
     ) {
       return next(errorHandler(400, "Please fill all the required fields"));
     }
-    const isUserDetailexist = new UserDetail.findOne({ userId });
+    const isUserDetailexist = await UserDetail.findOne({ userId });
     if (isUserDetailexist) {
       return next(errorHandler(400, "Your Details already exists."));
     }
     if (!profilePicture) {
       profilePicture =
         "https://avatar.iran.liara.run/username?username=" +
-        name.split(" ") +
-        join("+");
+        name.split(" ").join("+");
     }
 
     const newUserDetail = new UserDetail({
