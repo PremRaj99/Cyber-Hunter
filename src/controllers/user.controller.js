@@ -5,7 +5,23 @@ import Language from "../models/Language.model.js";
 import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
 import { errorHandler } from "../utils/error.js";
-import generateTokenAndSetCookie from "../utils/generateToken.js";
+
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save();
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw errorHandler(
+      500,
+      "Something went wrong while generating refresh token"
+    );
+  }
+};
 
 export const createUserDetail = async (req, res, next) => {
   try {
@@ -60,12 +76,16 @@ export const createUserDetail = async (req, res, next) => {
     const userDetaildata = await newUserDetail.save();
 
     const validUser = await User.findById(userId);
-    generateTokenAndSetCookie(validUser._id, res, validUser.role);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      userId
+    );
 
     const { password: pass, ...rest } = validUser._doc;
 
     const data = {
       ...rest,
+      accessToken,
+      refreshToken,
       name: userDetaildata.name,
       course: userDetaildata.course,
       session: userDetaildata.session,
@@ -77,7 +97,11 @@ export const createUserDetail = async (req, res, next) => {
       teamId: userDetaildata.teamId,
     };
 
-    res.status(200).json(data);
+    res
+      .status(200)
+      .cookie("accessToken", accessToken)
+      .cookie("refreshToken", refreshToken)
+      .json(ApiResponse(200, data, "User Detail created successfully."));
   } catch (error) {
     next(error);
   }

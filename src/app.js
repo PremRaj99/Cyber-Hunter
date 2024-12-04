@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import { ApiResponse } from "./utils/ApiResponse.js";
 
 dotenv.config();
 
@@ -12,12 +13,10 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 app.use(express.static("public"));
 app.use(
-  cors(
-    cors({
-      origin: process.env.CORS_ORIGIN,
-      credentials: true,
-    })
-  )
+  cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+  })
 );
 
 // import all router
@@ -38,15 +37,15 @@ app.use("/api/v1/techStack", techStackRoutes);
 app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
 
+app.get("/", (req, res) => {
+  res.send("Hello World");
+});
+
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "internal server error";
 
-  res.status(statusCode).json({
-    success: false,
-    statusCode,
-    message,
-  });
+  res.status(statusCode).json(ApiResponse(statusCode, null, message));
 });
 
 export default app;

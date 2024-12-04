@@ -1,8 +1,6 @@
 import User from "../models/User.model.js";
 import bcryptjs from "bcryptjs";
 import { errorHandler } from "../utils/error.js";
-import jwt from "jsonwebtoken";
-import generateTokenAndSetCookie from "../utils/generateToken.js";
 import UserDetail from "../models/UserDetail.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
@@ -22,8 +20,9 @@ const generateAccessAndRefreshTokens = async (userId) => {
     await user.save();
     return { accessToken, refreshToken };
   } catch (error) {
-    next(
-      errorHandler(500, "Something went wrong while generating refresh token")
+    throw errorHandler(
+      500,
+      "Something went wrong while generating refresh token"
     );
   }
 };
@@ -53,11 +52,23 @@ export const login = async (req, res, next) => {
     const userDetail = await UserDetail.findOne({ userId: validEmail._id });
 
     if (!userDetail) {
-      return res.status(200).json(rest);
+      console.log(res);
+      return res
+        .status(200)
+        .cookie("accessToken", accessToken)
+        .cookie("refreshToken", refreshToken)
+        .json(
+          ApiResponse(
+            200,
+            { ...rest, accessToken, refreshToken },
+            "Login Successful"
+          )
+        );
     }
     const data = {
       ...rest,
       accessToken,
+      refreshToken,
       name: userDetail.name,
       course: userDetail.course,
       session: userDetail.session,
@@ -98,10 +109,20 @@ export const signup = async (req, res, next) => {
     const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    generateTokenAndSetCookie(user._id, res, user.role);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
 
-    const { password: pass, ...rest } = user._doc;
-    res.status(200).json(rest);
+    const { password: pass, refreshToken: ref, ...rest } = user._doc;
+    res
+      .status(200)
+      .json(
+        ApiResponse(
+          200,
+          { ...rest, accessToken, refreshToken },
+          "Signup Successful"
+        )
+      );
   } catch (error) {
     next(error);
   }
@@ -128,4 +149,26 @@ export const logout = async (req, res, next) => {
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
     .json(ApiResponse(200, {}, "Logout Successful"));
+};
+
+export const refreshToken = async (req, res, next) => {
+  const { refreshToken } = req.cookies;
+  if (!refreshToken) {
+    return next(errorHandler(401, "Unauthorized"));
+  }
+  try {
+    const user = await User.findOne({ refreshToken });
+    if (!user) {
+      return next(errorHandler(401, "Unauthorized"));
+    }
+    const { accessToken, refreshToken: newRefreshToken } =
+      await generateAccessAndRefreshTokens(user._id);
+    res
+      .status(200)
+      .cookie("accessToken", accessToken)
+      .cookie("refreshToken", newRefreshToken)
+      .json(ApiResponse(200, { accessToken }, "Refresh Token Generated"));
+  } catch (error) {
+    next(error);
+  }
 };
