@@ -6,8 +6,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       require: true,
     },
+    qId: {
+      type: String,
+      require: true,
+      unique: true,
+    },
     userId: {
-      type: Number,
+      type: String,
       require: true,
       unique: true,
     },
@@ -32,16 +37,26 @@ const userSchema = new mongoose.Schema(
       default:
         "https://static-00.iconduck.com/assets.00/profile-circle-icon-512x512-zxne30hp.png",
     },
-    Intrest: {
+    interestId: {
       type: Array,
       default: [],
     },
     phoneNumber: {
       type: Number,
-      require: true,
-      maxLength: 10,
+      validate: {
+        validator: function (v) {
+          return /^[0-9]{10}$/.test(v);
+        },
+        message: "Invalid Phone Number",
+      },
+      required: true
     },
-    TeamId: {
+    gender: {
+      type: String,
+      required: true,
+      enum: ["male", "female", "others"]
+    },
+    teamId: {
       type: String,
       default: null,
     },
@@ -49,6 +64,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const User = mongoose.model("User", userSchema);
+const UserDetail = mongoose.model("UserDetail", userSchema);
 
-export default User;
+export default UserDetail;
