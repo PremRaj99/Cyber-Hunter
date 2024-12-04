@@ -5,7 +5,7 @@ export const createIndividual = async (req, res, next) => {
     const { description, tagId } = req.body;
 
     const newIndividual = new Individual({
-      userId: req.user.id,
+      userId: req.user._id,
       description,
       tagId,
     });

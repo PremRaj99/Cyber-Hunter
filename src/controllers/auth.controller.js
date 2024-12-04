@@ -116,6 +116,8 @@ export const signup = async (req, res, next) => {
     const { password: pass, refreshToken: ref, ...rest } = user._doc;
     res
       .status(200)
+      .cookie("accessToken", accessToken)
+      .cookie("refreshToken", refreshToken)
       .json(
         ApiResponse(
           200,

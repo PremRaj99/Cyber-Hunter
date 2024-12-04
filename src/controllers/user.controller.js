@@ -5,6 +5,7 @@ import Language from "../models/Language.model.js";
 import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
 import { errorHandler } from "../utils/error.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -37,7 +38,7 @@ export const createUserDetail = async (req, res, next) => {
       gender,
     } = req.body;
     let { profilePicture } = req.body;
-    const { id: userId } = req.user;
+    const { _id: userId } = req.user;
     if (
       !name ||
       !qId ||
@@ -108,10 +109,60 @@ export const createUserDetail = async (req, res, next) => {
 };
 export const updateUser = async (req, res, next) => {
   try {
-  } catch (error) {
+    const { id: userId } = req.user;
+    const {
+      name,
+      qId,
+      course,
+      session,
+      branch,
+      DOB,
+      interestId,
+      phoneNumber
+    } = req.body;
+    let { profilePicture } = req.body;
+    if (
+      !name ||
+      !qId ||
+      !course ||
+      !session ||
+      !branch ||
+      !DOB ||
+      !phoneNumber
+    ) {
+      return next(errorHandler(400, "Please fill all the required fields"));
+    }
+    const userDetail = await UserDetail
+
+
+      .findOne
+      ({ userId });
+    if (!userDetail) {
+      return next(errorHandler(404, "User Detail not found"));
+    }
+    if (!profilePicture) {
+      profilePicture =
+        "https://avatar.iran.liara.run/username?username=" +
+        name.split(" ").join("+");
+    }
+    userDetail.name = name;
+    userDetail.qId = qId;
+    userDetail.course = course;
+    userDetail.session = session;
+    userDetail.branch = branch;
+    userDetail.DOB = DOB;
+    userDetail.profilePicture = profilePicture;
+    userDetail.interestId = interestId;
+    userDetail.phoneNumber = phoneNumber;
+    await userDetail.save();
+
+    res.status(200).json(ApiResponse(200, null, "User Detail updated successfully."));
+  }
+  catch (error) {
     next(error);
   }
-};
+}
+
 export const deleteUser = async (req, res, next) => {
   try {
     const { userId } = req.params;

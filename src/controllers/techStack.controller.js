@@ -30,7 +30,7 @@ export const updateTechStack = async (req, res, next) => {
   const { techStackId } = req.params;
   let { content, logo } = req.body;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to update Tech Stack"));
     }
@@ -54,7 +54,7 @@ export const updateTechStack = async (req, res, next) => {
 export const deleteTechStack = async (req, res, next) => {
   const { techStackId } = req.params;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to delete TechStack"));
     }

@@ -30,7 +30,7 @@ export const updateInterest = async (req, res, next) => {
   const { interestId } = req.params;
   let { newContent } = req.body;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to update interest"));
     }
@@ -53,7 +53,7 @@ export const updateInterest = async (req, res, next) => {
 export const deleteInterest = async (req, res, next) => {
   const { interestId } = req.params;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to delete interest"));
     }

@@ -30,7 +30,7 @@ export const updateLanguage = async (req, res, next) => {
   const { languageId } = req.params;
   let { content, logo } = req.body;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to update Language"));
     }
@@ -54,7 +54,7 @@ export const updateLanguage = async (req, res, next) => {
 export const deleteLanguage = async (req, res, next) => {
   const { languageId } = req.params;
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
       return next(errorHandler(400, "You are not allowed to delete language"));
     }
