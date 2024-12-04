@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { DB_NAME } from "../constant.js";
 
-export default function connectToDb() {
+export default async function connectToDb() {
   mongoose
     .connect(process.env.MONGO + "/" + DB_NAME)
     .then(() => {

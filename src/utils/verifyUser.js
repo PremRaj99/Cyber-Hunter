@@ -3,7 +3,7 @@ import { errorHandler } from "./error.js";
 
 export const verifyToken = (req, res, next) => {
   const token =
-    req.cookie?.accessToken ||
+    req.cookies?.accessToken ||
     req.header("Authorization")?.replace("Beader ", "");
 
   if (!token) {
