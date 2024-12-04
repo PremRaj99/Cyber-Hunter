@@ -50,12 +50,17 @@ export const login = async (req, res, next) => {
 
     const { password: pass, ...rest } = validEmail._doc;
     const userDetail = await UserDetail.findOne({ userId: validEmail._id });
+    const options = {
+      httpOnly: true,
+      sameSite: "None",
+      secure: process.env.NODE_ENV === "production",
+    }
 
     if (!userDetail) {
       return res
         .status(200)
-        .cookie("accessToken", accessToken)
-        .cookie("refreshToken", refreshToken)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
         .json(
           ApiResponse(
             200,
@@ -81,8 +86,8 @@ export const login = async (req, res, next) => {
 
     res
       .status(200)
-      .cookie("accessToken", accessToken)
-      .cookie("refreshToken", refreshToken)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(ApiResponse(200, data, "Login Successful"));
   } catch (error) {
     next(error);
@@ -112,6 +117,12 @@ export const signup = async (req, res, next) => {
       user._id
     );
 
+    const options = {
+      httpOnly: true,
+      sameSite: "None",
+      secure: process.env.NODE_ENV === "production",
+    }
+
     const { password: pass, refreshToken: ref, ...rest } = user._doc;
     res
       .status(200)
@@ -120,7 +131,7 @@ export const signup = async (req, res, next) => {
       .json(
         ApiResponse(
           200,
-          { ...rest, accessToken, refreshToken },
+          { ...rest, accessToken, refreshToken, options },
           "Signup Successful"
         )
       );
@@ -164,10 +175,17 @@ export const refreshToken = async (req, res, next) => {
     }
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessAndRefreshTokens(user._id);
+
+      const options = {
+        httpOnly: true,
+        sameSite: "None",
+        secure: process.env.NODE_ENV === "production",
+      }
+
     res
       .status(200)
-      .cookie("accessToken", accessToken)
-      .cookie("refreshToken", newRefreshToken)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
       .json(ApiResponse(200, { accessToken }, "Refresh Token Generated"));
   } catch (error) {
     next(error);

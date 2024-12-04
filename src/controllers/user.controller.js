@@ -98,10 +98,16 @@ export const createUserDetail = async (req, res, next) => {
       teamId: userDetaildata.teamId,
     };
 
+    const options = {
+      httpOnly: true,
+      sameSite: "None",
+      secure: process.env.NODE_ENV === "production",
+    }
+
     res
       .status(200)
-      .cookie("accessToken", accessToken)
-      .cookie("refreshToken", refreshToken)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(ApiResponse(200, data, "User Detail created successfully."));
   } catch (error) {
     next(error);
