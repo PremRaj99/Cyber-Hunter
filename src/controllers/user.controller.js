@@ -110,33 +110,10 @@ export const createUserDetail = async (req, res, next) => {
 export const updateUser = async (req, res, next) => {
   try {
     const { id: userId } = req.user;
-    const {
-      name,
-      qId,
-      course,
-      session,
-      branch,
-      DOB,
-      interestId,
-      phoneNumber
-    } = req.body;
+    const { name, qId, course, session, branch, DOB, interestId, phoneNumber } =
+      req.body;
     let { profilePicture } = req.body;
-    if (
-      !name ||
-      !qId ||
-      !course ||
-      !session ||
-      !branch ||
-      !DOB ||
-      !phoneNumber
-    ) {
-      return next(errorHandler(400, "Please fill all the required fields"));
-    }
-    const userDetail = await UserDetail
-
-
-      .findOne
-      ({ userId });
+    const userDetail = await UserDetail.findOne({ userId });
     if (!userDetail) {
       return next(errorHandler(404, "User Detail not found"));
     }
@@ -145,23 +122,24 @@ export const updateUser = async (req, res, next) => {
         "https://avatar.iran.liara.run/username?username=" +
         name.split(" ").join("+");
     }
-    userDetail.name = name;
-    userDetail.qId = qId;
-    userDetail.course = course;
-    userDetail.session = session;
-    userDetail.branch = branch;
-    userDetail.DOB = DOB;
-    userDetail.profilePicture = profilePicture;
-    userDetail.interestId = interestId;
-    userDetail.phoneNumber = phoneNumber;
+    userDetail.name = name || userDetail.name;
+    userDetail.qId = qId || userDetail.qId;
+    userDetail.course = course || userDetail.course;
+    userDetail.session = session || userDetail.session;
+    userDetail.branch = branch || userDetail.branch;
+    userDetail.DOB = DOB || userDetail.DOB;
+    userDetail.profilePicture = profilePicture || userDetail.profilePicture;
+    userDetail.interestId = interestId || userDetail.interestId;
+    userDetail.phoneNumber = phoneNumber || userDetail.phoneNumber;
     await userDetail.save();
 
-    res.status(200).json(ApiResponse(200, null, "User Detail updated successfully."));
-  }
-  catch (error) {
+    res
+      .status(200)
+      .json(ApiResponse(200, null, "User Detail updated successfully."));
+  } catch (error) {
     next(error);
   }
-}
+};
 
 export const deleteUser = async (req, res, next) => {
   try {
@@ -183,7 +161,7 @@ export const getUser = async (req, res, next) => {
     const individual = await Individual.findOne({ userId });
 
     if (!individual) {
-      return res.status(404).json({ message: "Individual not found" });
+      return next(errorHandler(404, "Individual not found"));
     }
     const projects = await Project.find({
       status: "active",

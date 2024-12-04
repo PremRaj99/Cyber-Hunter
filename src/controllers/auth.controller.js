@@ -52,7 +52,6 @@ export const login = async (req, res, next) => {
     const userDetail = await UserDetail.findOne({ userId: validEmail._id });
 
     if (!userDetail) {
-      console.log(res);
       return res
         .status(200)
         .cookie("accessToken", accessToken)
