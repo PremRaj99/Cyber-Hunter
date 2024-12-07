@@ -12,9 +12,11 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 app.use(express.static("public"));
+app.use(morgan("dev"));
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
@@ -27,6 +29,7 @@ import tagRoutes from "./routes/tag.route.js";
 import techStackRoutes from "./routes/techStack.route.js";
 import languageRoutes from "./routes/language.rotue.js";
 import interestRoutes from "./routes/interest.route.js";
+import morgan from "morgan";
 
 // define routes
 app.use("/api/v1/auth", authRoutes);
