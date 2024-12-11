@@ -82,6 +82,7 @@ export const login = async (req, res, next) => {
       phoneNumber: userDetail.phoneNumber,
       gender: userDetail.gender,
       teamId: userDetail.teamId,
+      qId: userDetail.qId,
     };
 
     res
