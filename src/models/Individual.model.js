@@ -3,35 +3,44 @@ import mongoose from "mongoose";
 const individualSchema = new mongoose.Schema(
   {
     userId: {
-        type: String,
-        require: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      require: true,
+      unique: true,
+    },
+    description: {
+      type: String,
+    },
+    projectId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
         unique: true,
       },
-      description: {
-          type: String,
+    ],
+    achievementId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Achievement",
+        unique: true,
       },
-      projectId: {
-          type: Array,
-          default: [],
-          unique: true,
+    ],
+    point: {
+      type: Number,
+      default: 0,
+    },
+    tagId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Tag",
       },
-      achievementId: {
-          type: Array,
-          default: [],
-          unique: true,
+    ],
+    badgeId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Badge",
       },
-      point: {
-          type: Number,
-          default: 0,
-      },
-      tagId: {
-          type: Array,
-          default: [],
-      },
-      badgeId: {
-          type: Array,
-          default: [],
-      }
+    ],
   },
   { timestamps: true }
 );

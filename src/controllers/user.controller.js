@@ -6,6 +6,7 @@ import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
 import { errorHandler } from "../utils/error.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import options from "../utils/cookieOptions.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -37,7 +38,6 @@ export const createUserDetail = async (req, res, next) => {
       phoneNumber,
       gender,
     } = req.body;
-    let { profilePicture } = req.body;
     const { _id: userId } = req.user;
     if (
       !name ||
@@ -55,8 +55,20 @@ export const createUserDetail = async (req, res, next) => {
     if (isUserDetailexist) {
       return next(errorHandler(400, "Your Details already exists."));
     }
-    if (!profilePicture) {
-      profilePicture =
+
+    const profilePictureLocalPath = req.files?.profilePicture?.[0]?.path;
+
+    let profilePictureUrl;
+
+    if (profilePictureLocalPath) {
+      const profilePicture = await uploadOnCloudinary(profilePictureLocalPath);
+      if (avatar) {
+        profilePictureUrl = profilePicture.url;
+      }
+    }
+
+    if (!profilePictureUrl) {
+      profilePictureUrl =
         "https://avatar.iran.liara.run/username?username=" +
         name.split(" ").join("+");
     }
@@ -69,7 +81,7 @@ export const createUserDetail = async (req, res, next) => {
       session,
       branch,
       DOB,
-      profilePicture,
+      profilePicture: profilePictureUrl,
       interestId,
       phoneNumber: Number(phoneNumber),
       gender,
@@ -98,12 +110,6 @@ export const createUserDetail = async (req, res, next) => {
       teamId: userDetaildata.teamId,
     };
 
-    const options = {
-      httpOnly: true,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
-    }
-
     res
       .status(200)
       .cookie("accessToken", accessToken, options)
@@ -118,23 +124,29 @@ export const updateUser = async (req, res, next) => {
     const { id: userId } = req.user;
     const { name, qId, course, session, branch, DOB, interestId, phoneNumber } =
       req.body;
-    let { profilePicture } = req.body;
     const userDetail = await UserDetail.findOne({ userId });
     if (!userDetail) {
       return next(errorHandler(404, "User Detail not found"));
     }
-    if (!profilePicture) {
-      profilePicture =
-        "https://avatar.iran.liara.run/username?username=" +
-        name.split(" ").join("+");
+
+    const profilePictureLocalPath = req.files?.profilePicture?.[0]?.path;
+
+    let profilePictureUrl;
+
+    if (profilePictureLocalPath) {
+      const profilePicture = await uploadOnCloudinary(profilePictureLocalPath);
+      if (avatar) {
+        profilePictureUrl = profilePicture.url;
+      }
     }
+
     userDetail.name = name || userDetail.name;
     userDetail.qId = qId || userDetail.qId;
     userDetail.course = course || userDetail.course;
     userDetail.session = session || userDetail.session;
     userDetail.branch = branch || userDetail.branch;
     userDetail.DOB = DOB || userDetail.DOB;
-    userDetail.profilePicture = profilePicture || userDetail.profilePicture;
+    userDetail.profilePicture = profilePictureUrl || userDetail.profilePicture;
     userDetail.interestId = interestId || userDetail.interestId;
     userDetail.phoneNumber = phoneNumber || userDetail.phoneNumber;
     await userDetail.save();

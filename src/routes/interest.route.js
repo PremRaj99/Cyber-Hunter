@@ -1,14 +1,14 @@
 import { createInterest, deleteInterest, getInterests, updateInterest } from "../controllers/interest.controller.js";
-import { verifyToken } from "../utils/verifyUser.js";
+import { verifyJWT } from "../middlewares/verifyUser.js";
 import express from "express"
 
 const Router = express.Router();
 
 // define all routes
 
-Router.post("/", verifyToken, createInterest);
-Router.put("/:interestId", verifyToken, updateInterest)
-Router.delete("/:interestId", verifyToken, deleteInterest)
+Router.post("/", verifyJWT, createInterest);
+Router.put("/:interestId", verifyJWT, updateInterest)
+Router.delete("/:interestId", verifyJWT, deleteInterest)
 Router.get("/", getInterests)
 
 export default Router;

@@ -7,17 +7,20 @@ const commentSchema = new mongoose.Schema(
       require: true,
     },
     content: {
-        type: String,
-        require: true,
+      type: String,
+      require: true,
     },
-    like: {
-        type: Array,
+    like: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         default: [],
-    },
+      },
+    ],
     status: {
-        type: String,
-        default: "pending",
-    }
+      type: String,
+      default: "pending",
+    },
   },
   { timestamps: true }
 );

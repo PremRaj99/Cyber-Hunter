@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "user",
-      emum: ["user", "moderator", "admin"],
+      emum: ["user", "vendor", "admin"],
     },
     refreshToken: {
       type: String,
@@ -40,6 +40,7 @@ userSchema.methods.generateAccessToken = function () {
       email: this.email,
       username: this.username,
       fullName: this.fullName,
+      role: this.role,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {

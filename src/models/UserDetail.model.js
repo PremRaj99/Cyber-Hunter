@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema(
       unique: true,
     },
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       require: true,
       unique: true,
     },
@@ -37,10 +38,13 @@ const userSchema = new mongoose.Schema(
       default:
         "https://static-00.iconduck.com/assets.00/profile-circle-icon-512x512-zxne30hp.png",
     },
-    interestId: {
-      type: Array,
-      default: [],
-    },
+    interestId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Interest",
+        default: [],
+      },
+    ],
     phoneNumber: {
       type: Number,
       validate: {
@@ -51,13 +55,18 @@ const userSchema = new mongoose.Schema(
       },
       required: true
     },
+    phoneNumberVerified: {
+      type: Boolean,
+      default: false,
+    },
     gender: {
       type: String,
       required: true,
       enum: ["male", "female", "others"]
     },
     teamId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
       default: null,
     },
   },

@@ -3,48 +3,52 @@ import mongoose from "mongoose";
 const acheivementSchema = new mongoose.Schema(
   {
     userId: {
-        type: String,
-        unique : true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      unique: true,
     },
     teamId: {
-        type: String,
-        unique : true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
+      unique: true,
     },
     acheivementName: {
-        type: String,
+      type: String,
     },
     acheivementDescription: {
-        type: String,
+      type: String,
     },
     acheivementThumbnail: {
-        type: String,
+      type: String,
     },
     tagId: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Tag",
+      default: [],
     },
     point: {
-        type: Number,
-        default: 0,
+      type: Number,
+      default: 0,
     },
     badgeId: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Badge",
+      default: [],
     },
     type: {
-        type: String,
+      type: String,
     },
     level: {
-        type: String,
+      type: String,
     },
     status: {
-        type: String,
-        default: "pending",
+      type: String,
+      default: "pending",
     },
     position: {
-        type: String,
-        default: "participation",
-    }
+      type: String,
+      default: "participation",
+    },
   },
   { timestamps: true }
 );

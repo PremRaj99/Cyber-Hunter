@@ -3,6 +3,10 @@ import bcryptjs from "bcryptjs";
 import { errorHandler } from "../utils/error.js";
 import UserDetail from "../models/UserDetail.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import options from "../utils/cookieOptions.js";
+import generateCrypto from "../utils/generateCryptoCode.js";
+import { sendMail } from "../utils/mailHandler.js";
+import EmailVerification from "../models/EmailVerification.model.js";
 
 export const test = (req, res) => {
   res.json({
@@ -50,11 +54,6 @@ export const login = async (req, res, next) => {
 
     const { password: pass, ...rest } = validEmail._doc;
     const userDetail = await UserDetail.findOne({ userId: validEmail._id });
-    const options = {
-      httpOnly: true,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
-    };
 
     if (!userDetail) {
       return res
@@ -118,12 +117,6 @@ export const signup = async (req, res, next) => {
       user._id
     );
 
-    const options = {
-      httpOnly: true,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
-    };
-
     const { password: pass, refreshToken: ref, ...rest } = user._doc;
     res
       .cookie("accessToken", accessToken, options)
@@ -132,7 +125,7 @@ export const signup = async (req, res, next) => {
       .json(
         ApiResponse(
           200,
-          { ...rest, accessToken, refreshToken, options },
+          { ...rest, accessToken, refreshToken },
           "Signup Successful"
         )
       );
@@ -154,10 +147,6 @@ export const logout = async (req, res, next) => {
     }
   );
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
   res
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
@@ -178,17 +167,185 @@ export const refreshToken = async (req, res, next) => {
     const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessAndRefreshTokens(user._id);
 
-    const options = {
-      httpOnly: true,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
-    };
-
     res
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", newRefreshToken, options)
       .status(200)
       .json(ApiResponse(200, { accessToken }, "Refresh Token Generated"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendEmailRequest = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(errorHandler(404, "User Not Found"));
+    }
+    const token = generateCrypto(user._id, email);
+
+    const html = `
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTP Verification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .content {
+      padding: 20px;
+      text-align: center;
+    }
+    .otp {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 20px 0;
+    }
+    .footer {
+      background: #f4f4f4;
+      color: #555;
+      font-size: 12px;
+      text-align: center;
+      padding: 10px;
+    }
+    .footer a {
+      color: #4CAF50;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>OTP Verification</h1>
+    </div>
+    <div class="content">
+      <p>Dear User,</p>
+      <p>Use the OTP below to verify your email address:</p>
+      <div class="otp">123456</div>
+      <p>This OTP is valid for 10 minutes.</p>
+      <p>If you didn’t request this, please ignore this email.</p>
+    </div>
+    <div class="footer">
+      <p>Thank you for using our service.</p>
+      <p><a href="https://www.example.com">Visit our website</a></p>
+    </div>
+  </div>
+</body>
+</html>
+
+    `;
+
+    sendMail(
+      user.email,
+      "Cyber Hunter Email Verification",
+      "Verify your email",
+      html
+    );
+
+    res.status(200).json(ApiResponse(200, {}, "OTP send to your email"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const email = await EmailVerification.findOne({
+      userId: req.user._id,
+    });
+
+    if (!email) {
+      return next(errorHandler(404, "Email not found"));
+    }
+
+    if (email.token !== token) {
+      return next(errorHandler(404, "Invalid Token"));
+    }
+
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          emailVerified: true,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+    res.status(200).json(ApiResponse(200, {}, "Email Verified"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(errorHandler(404, "User Not Found"));
+    }
+    res.status(200).json(ApiResponse(200, {}, "Password Reset Link Sent"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { email, password, confirmPassword } = req.body;
+    if (!email || !password || password === "" || !confirmPassword) {
+      return next(errorHandler(404, "All fields are required!"));
+    }
+    if (password !== confirmPassword) {
+      return next(errorHandler(404, "Password donot match!"));
+    }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(errorHandler(404, "User Not Found"));
+    }
+    const salt = bcryptjs.genSaltSync(10);
+    const hashedPassword = bcryptjs.hashSync(password, salt);
+
+    await User.findByIdAndUpdate(
+      user._id,
+      {
+        $set: {
+          password: hashedPassword,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    res.status(200).json(ApiResponse(200, {}, "Password Reset Successful"));
   } catch (error) {
     next(error);
   }

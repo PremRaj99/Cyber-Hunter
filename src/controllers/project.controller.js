@@ -7,8 +7,6 @@ export const createProject = async (req, res, next) => {
     const {
       projectName,
       projectDescription,
-      projectThumbnail,
-      projectImage,
       gitHubLink,
       liveLink,
       techStack,
@@ -21,6 +19,40 @@ export const createProject = async (req, res, next) => {
       return next(errorHandler(400, "Please fill all the required fields."));
     }
 
+    const projectThumbnailLocalPath = req.files?.projectThumbnail?.[0]?.path;
+
+    let projectThumbnailUrl;
+
+    if (projectThumbnailLocalPath) {
+      const projectThumbnail = await uploadOnCloudinary(
+        projectThumbnailLocalPath
+      );
+      if (avatar) {
+        projectThumbnailUrl = projectThumbnail.url;
+      }
+    }
+
+    if (!projectThumbnailUrl) {
+      next(errorHandler(400, "Please upload project thumbnail."));
+    }
+
+    const projectImageLocalPaths = req.files?.projectImage?.map(
+      (file) => file.path
+    );
+
+    let projectImageUrl = [];
+
+    if (projectImageLocalPaths) {
+      projectImageUrl = await Promise.all(
+        projectImageLocalPaths.map(async (path) => {
+          const image = await uploadOnCloudinary(path);
+          return image.url;
+        })
+      );
+    }
+
+    const projectImage = projectImageUrl;
+
     let newProject;
 
     if (teamId) {
@@ -32,7 +64,7 @@ export const createProject = async (req, res, next) => {
         projectName,
         projectDescription,
         projectImage,
-        projectThumbnail,
+        projectThumbnail: projectThumbnailUrl,
         gitHubLink,
         liveLink,
         techStack,
@@ -46,7 +78,7 @@ export const createProject = async (req, res, next) => {
         projectName,
         projectDescription,
         projectImage,
-        projectThumbnail,
+        projectThumbnail : projectThumbnailUrl,
         gitHubLink,
         liveLink,
         techStack,

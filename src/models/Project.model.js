@@ -3,73 +3,81 @@ import mongoose from "mongoose";
 const projectSchema = new mongoose.Schema(
   {
     userId: {
-        type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     teamId: {
-        type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
+      required: true,
     },
     projectName: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     projectImage: {
-        type: Array,
-        default: [],
+      type: Array,
+      default: [],
     },
     gitHubLink: {
-        type: String,
-        required: true,
+      type: String,
+      required: true,
     },
     liveLink: {
-        type: String,
+      type: String,
     },
     projectDescription: {
-        type: String, 
+      type: String,
     },
     projectThumbnail: {
-        type: String,
-        required: true,
+      type: String,
+      required: true,
     },
     tagId: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Tag",
+      default: [],
     },
     rating: {
-        type: Number,
-        default: 0,
+      type: Number,
+      default: 0,
     },
     point: {
-        type: Number,
-        default: 0,
+      type: Number,
+      default: 0,
     },
     totalPoint: {
-        type: Number,
-        default: 0,
+      type: Number,
+      default: 0,
     },
     commentId: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Comment",
+      default: [],
     },
     like: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "User",
+      default: [],
     },
     techStack: {
-        type: Array,
-        default: [],
+      type: [String],
+      default: [],
     },
     language: {
-        type: Array,
-        default: [],
+      type: [String],
+      default: [],
     },
     badgeId: {
-        type: Array,
-        default: [],
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Badge",
+      default: [],
     },
     status: {
-        type: String,
-        default: "pending",
-        enum: ["pending", "active"]
+      type: String,
+      default: "pending",
+      enum: ["pending", "active"],
     },
   },
   { timestamps: true }
