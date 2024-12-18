@@ -1,4 +1,4 @@
-import EmailVerification from "../models/EmailVerification.model";
+import EmailVerification from "../models/EmailVerification.model.js";
 import crypto from "crypto";
 
 export default async function generateCrypto(userId, email) {

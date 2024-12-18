@@ -1,5 +1,6 @@
 import express from "express";
 import { verifyJWT } from "../middlewares/verifyUser.js";
+import { upload } from "../middlewares/multer.middleware.js";
 import {
   createProject,
   deleteProject,
@@ -28,6 +29,21 @@ Router.post(
   ]),
   createProject
 );
+// Router.post(
+//   "/",
+//   verifyJWT,
+//   upload.fields([
+//     {
+//       name: "projectImage",
+//       maxCount: 5,
+//     },
+//     {
+//       name: "projectThumbnail",
+//       maxCount: 1,
+//     },
+//   ]),
+//   createProject
+// );
 
 // update project
 Router.put(
