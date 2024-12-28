@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       require: true,
     },
+    section: {
+      type: String,
+      require: true,
+    },
     branch: {
       type: String,
       require: true,

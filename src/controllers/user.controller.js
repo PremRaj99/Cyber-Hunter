@@ -7,6 +7,7 @@ import UserDetail from "../models/UserDetail.model.js";
 import { errorHandler } from "../utils/error.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import options from "../utils/cookieOptions.js";
+import uploadOnCloudinary from "../utils/fileUpload.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -35,6 +36,7 @@ export const createUserDetail = async (req, res, next) => {
       branch,
       DOB,
       interestId,
+      section,
       phoneNumber,
       gender,
     } = req.body;
@@ -44,6 +46,7 @@ export const createUserDetail = async (req, res, next) => {
       !qId ||
       !course ||
       !session ||
+      !section ||
       !branch ||
       !DOB ||
       !phoneNumber ||
@@ -62,7 +65,7 @@ export const createUserDetail = async (req, res, next) => {
 
     if (profilePictureLocalPath) {
       const profilePicture = await uploadOnCloudinary(profilePictureLocalPath);
-      if (avatar) {
+      if (profilePicture) {
         profilePictureUrl = profilePicture.url;
       }
     }
@@ -79,6 +82,7 @@ export const createUserDetail = async (req, res, next) => {
       userId,
       course,
       session,
+      section,
       branch,
       DOB,
       profilePicture: profilePictureUrl,
