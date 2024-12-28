@@ -20,7 +20,7 @@ export const sendMail = async (to, subject, text, html) => {
 
     const sender = {
       name: process.env.MAILTRAP_USER,
-      email: process.env.MAILTRAP_EMAIL,
+      address: process.env.MAILTRAP_EMAIL,
     };
 
     // Setup email data
