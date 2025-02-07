@@ -1,6 +1,7 @@
 import Project from "../models/Project.model.js";
 import TeamDetail from "../models/TeamDetail.model.js";
 import { errorHandler } from "../utils/error.js";
+import uploadOnCloudinary from "../utils/fileUpload.js";
 
 export const createProject = async (req, res, next) => {
   try {
@@ -15,7 +16,7 @@ export const createProject = async (req, res, next) => {
       tagId,
     } = req.body;
 
-    if (!projectName || !gitHubLink || !projectThumbnail) {
+    if (!projectName || !gitHubLink) {
       return next(errorHandler(400, "Please fill all the required fields."));
     }
 
@@ -27,7 +28,7 @@ export const createProject = async (req, res, next) => {
       const projectThumbnail = await uploadOnCloudinary(
         projectThumbnailLocalPath
       );
-      if (avatar) {
+      if (projectThumbnail) {
         projectThumbnailUrl = projectThumbnail.url;
       }
     }
