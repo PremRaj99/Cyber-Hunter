@@ -66,7 +66,7 @@ Router.put(
 Router.delete("/:projectId", verifyJWT, deleteProject);
 
 // get all projects
-Router.get("/", getProjects);
+Router.get("/",verifyJWT, getProjects);
 
 // get project
 Router.get("/:projectId", getProject);

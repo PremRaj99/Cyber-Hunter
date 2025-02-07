@@ -229,6 +229,8 @@ export const getUser = async (req, res, next) => {
 
 export const getUsers = async (req, res, next) => {
   try {
+    const users = await User.find().select("-password");
+    res.status(200).json(ApiResponse(200, users, "Users fetched successfully."));
   } catch (error) {
     next(error);
   }

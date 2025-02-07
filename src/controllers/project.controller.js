@@ -75,7 +75,7 @@ export const createProject = async (req, res, next) => {
     } else {
       // code of individual project
       newProject = new Project({
-        userId: req.user.id,
+        userId: req.user._id,
         projectName,
         projectDescription,
         projectImage,
@@ -98,6 +98,62 @@ export const createProject = async (req, res, next) => {
 
 export const updateProject = async (req, res, next) => {
   try {
+    const { projectId } = req.params;
+    const {
+      projectName,
+      projectDescription,
+      gitHubLink,
+      liveLink,
+      techStack,
+      language,
+      teamId,
+      tagId,
+    } = req.body;
+
+    const projectThumbnailLocalPath = req.files?.projectThumbnail?.[0]?.path;
+    let projectThumbnailUrl;
+
+    if (projectThumbnailLocalPath) {
+      const projectThumbnail = await uploadOnCloudinary(projectThumbnailLocalPath);
+      if (projectThumbnail) {
+        projectThumbnailUrl = projectThumbnail.url;
+      }
+    }
+
+    const projectImageLocalPaths = req.files?.projectImage?.map((file) => file.path);
+    let projectImageUrl = [];
+
+    if (projectImageLocalPaths) {
+      projectImageUrl = await Promise.all(
+        projectImageLocalPaths.map(async (path) => {
+          const image = await uploadOnCloudinary(path);
+          return image.url;
+        })
+      );
+    }
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      {
+        projectName,
+        projectDescription,
+        projectImage: projectImageUrl.length ? projectImageUrl : undefined,
+        projectThumbnail: projectThumbnailUrl ? projectThumbnailUrl : undefined,
+        gitHubLink,
+        liveLink,
+        techStack,
+        language,
+        teamId,
+        tagId,
+      },
+      { new: true }
+    );
+
+    if (!updatedProject) {
+      return next(errorHandler(404, "Project not found"));
+    }
+
+    res.status(200).json("Project updated successfully");
   } catch (error) {
     next(error);
   }
@@ -105,6 +161,14 @@ export const updateProject = async (req, res, next) => {
 
 export const deleteProject = async (req, res, next) => {
   try {
+    const { projectId } = req.params;
+    const project = await Project.findByIdAndDelete(projectId);
+
+    if (!project) {
+      return next(errorHandler(404, "Project not found"));
+    }
+
+    res.status(200).json("Project deleted successfully");
   } catch (error) {
     next(error);
   }
@@ -112,6 +176,8 @@ export const deleteProject = async (req, res, next) => {
 
 export const getProjects = async (req, res, next) => {
   try {
+    const projects = await Project.find({ userId: req.user._id });
+    res.status(200).json(projects);
   } catch (error) {
     next(error);
   }
@@ -119,6 +185,14 @@ export const getProjects = async (req, res, next) => {
 
 export const getProject = async (req, res, next) => {
   try {
+    const { projectId } = req.params;
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return next(errorHandler(404, "Project not found"));
+    }
+
+    res.status(200).json(project);
   } catch (error) {
     next(error);
   }
