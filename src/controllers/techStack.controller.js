@@ -101,14 +101,10 @@ export const getMyTechStacks = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
-    const projcts = await Project.find({ userId }).populate("techStack");
+    const projcts = await Project.find({ userId }).populate("techStack", "content");
     const techStacks = projcts.map((project) => project.techStack);
 
-    const data = techStacks.map((techStack) => ({
-      content: techStack.content,
-    }));
-
-    res.status(200).json(data);
+    res.status(200).json(techStacks);
   } catch (error) {
     next(error);
   }
