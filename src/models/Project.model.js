@@ -59,14 +59,20 @@ const projectSchema = new mongoose.Schema(
       ref: "User",
       default: [],
     },
-    techStack: {
-      type: [String],
-      default: [],
-    },
-    language: {
-      type: [String],
-      default: [],
-    },
+    techStack: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TechStack",
+        default: [],
+      },
+    ],
+    language: [
+      { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: "Language", 
+        default: [] 
+      },
+    ],
     badgeId: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: "Badge",

@@ -1,5 +1,6 @@
 import Project from "../models/Project.model.js";
 import TeamDetail from "../models/TeamDetail.model.js";
+import UserDetail from "../models/UserDetail.model.js";
 import { errorHandler } from "../utils/error.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
 
@@ -79,7 +80,7 @@ export const createProject = async (req, res, next) => {
         projectName,
         projectDescription,
         projectImage,
-        projectThumbnail : projectThumbnailUrl,
+        projectThumbnail: projectThumbnailUrl,
         gitHubLink,
         liveLink,
         techStack,
@@ -114,13 +115,17 @@ export const updateProject = async (req, res, next) => {
     let projectThumbnailUrl;
 
     if (projectThumbnailLocalPath) {
-      const projectThumbnail = await uploadOnCloudinary(projectThumbnailLocalPath);
+      const projectThumbnail = await uploadOnCloudinary(
+        projectThumbnailLocalPath
+      );
       if (projectThumbnail) {
         projectThumbnailUrl = projectThumbnail.url;
       }
     }
 
-    const projectImageLocalPaths = req.files?.projectImage?.map((file) => file.path);
+    const projectImageLocalPaths = req.files?.projectImage?.map(
+      (file) => file.path
+    );
     let projectImageUrl = [];
 
     if (projectImageLocalPaths) {
@@ -186,13 +191,30 @@ export const getProjects = async (req, res, next) => {
 export const getProject = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).populate([
+      {
+        path: "tagId",
+        select: "content",
+      },
+      {
+        path: "techStack",
+        select: "content",
+      },
+      {
+        path: "language",
+        select: "content",
+      },
+    ]);
+
+    const userDetail = await UserDetail.findOne({
+      userId: project.userId,
+    }).populate("interestId", "content");
 
     if (!project) {
       return next(errorHandler(404, "Project not found"));
     }
 
-    res.status(200).json(project);
+    res.status(200).json({ project, userDetail });
   } catch (error) {
     next(error);
   }

@@ -180,11 +180,11 @@ export const getUser = async (req, res, next) => {
   const { userId } = req.params;
   try {
     const userDetail = await UserDetail.findOne({ userId });
-    const individual = await Individual.findOne({ userId });
+    // const individual = await Individual.findOne({ userId });
 
-    if (!individual) {
-      return next(errorHandler(404, "Individual not found"));
-    }
+    // if (!individual) {
+    //   return next(errorHandler(404, "Individual not found"));
+    // }
     const projects = await Project.find({
       status: "active",
       _id: { $in: individual.projectId },
