@@ -21,7 +21,6 @@ export const createTechStack = async (req, res, next) => {
       logo: savedTechStack.logo,
       content: savedTechStack.content,
     });
-
   } catch (error) {
     next(error);
   }
@@ -32,11 +31,12 @@ export const updateTechStack = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
     if (user.role !== "admin" || user.role !== "moderator") {
-      return next(errorHandler(400, "You are not allowed to update Tech Stack"));
+      return next(
+        errorHandler(400, "You are not allowed to update Tech Stack")
+      );
     }
 
-    content =
-      content.charAt(0).toUpperCase() + content.toLowerCase().slice(1);
+    content = content.charAt(0).toUpperCase() + content.toLowerCase().slice(1);
     if (!content) {
       return next(errorHandler(400, "fill required content."));
     }
@@ -64,7 +64,9 @@ export const deleteTechStack = async (req, res, next) => {
 
     // Update each project to remove the techStackId from the techStack array
     for (const project of projects) {
-      project.techStack = project.techStack.filter((tag) => tag.toString() !== techStackId);
+      project.techStack = project.techStack.filter(
+        (tag) => tag.toString() !== techStackId
+      );
       await project.save();
     }
 
@@ -86,6 +88,23 @@ export const getTechStacks = async (req, res, next) => {
 
     const data = techStacks.map((techStack) => ({
       tagId: techStack._id,
+      content: techStack.content,
+    }));
+
+    res.status(200).json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyTechStacks = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const projcts = await Project.find({ userId }).populate("techStack");
+    const techStacks = projcts.map((project) => project.techStack);
+
+    const data = techStacks.map((techStack) => ({
       content: techStack.content,
     }));
 
