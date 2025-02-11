@@ -128,7 +128,7 @@ export const createUserDetail = async (req, res, next) => {
       profilePicture: userDetaildata.profilePicture,
       DOB: userDetaildata.DOB,
       phoneNumber: userDetaildata.phoneNumber,
-      bio: individual.description,
+      bio: individual?.description || "",
       gender: userDetaildata.gender,
       teamId: userDetaildata.teamId,
       interest: interest.map((int) => int.content),
