@@ -8,6 +8,7 @@ import { errorHandler } from "../utils/error.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import options from "../utils/cookieOptions.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
+import Interest from "../models/Interest.model.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -39,6 +40,7 @@ export const createUserDetail = async (req, res, next) => {
       section,
       phoneNumber,
       gender,
+      bio,
     } = req.body;
     const { _id: userId } = req.user;
     if (
@@ -50,7 +52,8 @@ export const createUserDetail = async (req, res, next) => {
       !branch ||
       !DOB ||
       !phoneNumber ||
-      !gender
+      !gender ||
+      !bio
     ) {
       return next(errorHandler(400, "Please fill all the required fields"));
     }
@@ -92,10 +95,25 @@ export const createUserDetail = async (req, res, next) => {
     });
     const userDetaildata = await newUserDetail.save();
 
+    const individual = await Individual.findOne({ userId });
+
+    if (!individual) {
+      const newIndividual = new Individual({
+        userId,
+        description: bio,
+      });
+      await newIndividual.save();
+    } else {
+      individual.description = bio;
+      await individual.save();
+    }
+
+    // get interest for its id
+    const interest = await Interest.find({ _id: { $in: interestId } }).select("content -_id");
+
     const validUser = await User.findById(userId);
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-      userId
-    );
+    const { accessToken, refreshToken } =
+      await generateAccessAndRefreshTokens(userId);
 
     const { password: pass, ...rest } = validUser._doc;
 
@@ -110,8 +128,10 @@ export const createUserDetail = async (req, res, next) => {
       profilePicture: userDetaildata.profilePicture,
       DOB: userDetaildata.DOB,
       phoneNumber: userDetaildata.phoneNumber,
+      bio: individual.description,
       gender: userDetaildata.gender,
       teamId: userDetaildata.teamId,
+      interest: interest.map((int) => int.content),
     };
 
     res
@@ -180,11 +200,11 @@ export const getUser = async (req, res, next) => {
   const { userId } = req.params;
   try {
     const userDetail = await UserDetail.findOne({ userId });
-    // const individual = await Individual.findOne({ userId });
+    const individual = await Individual.findOne({ userId });
 
-    // if (!individual) {
-    //   return next(errorHandler(404, "Individual not found"));
-    // }
+    if (!individual) {
+      return next(errorHandler(404, "Individual not found"));
+    }
     const projects = await Project.find({
       status: "active",
       _id: { $in: individual.projectId },
@@ -230,7 +250,9 @@ export const getUser = async (req, res, next) => {
 export const getUsers = async (req, res, next) => {
   try {
     const users = await User.find().select("-password");
-    res.status(200).json(ApiResponse(200, users, "Users fetched successfully."));
+    res
+      .status(200)
+      .json(ApiResponse(200, users, "Users fetched successfully."));
   } catch (error) {
     next(error);
   }

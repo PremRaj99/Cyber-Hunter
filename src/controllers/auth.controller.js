@@ -7,6 +7,7 @@ import options from "../utils/cookieOptions.js";
 import generateCrypto from "../utils/generateCryptoCode.js";
 import { sendMail } from "../utils/mailHandler.js";
 import EmailVerification from "../models/EmailVerification.model.js";
+import Individual from "../models/Individual.model.js";
 
 export const test = (req, res) => {
   res.json({
@@ -53,7 +54,11 @@ export const login = async (req, res, next) => {
     );
 
     const { password: pass, ...rest } = validEmail._doc;
-    const userDetail = await UserDetail.findOne({ userId: validEmail._id });
+    const userDetail = await UserDetail.findOne({
+      userId: validEmail._id,
+    }).populate("interestId", "content -_id");
+
+    const individual = await Individual.findOne({ userId: validEmail._id }).select("-_id -userId");
 
     if (!userDetail) {
       return res
@@ -82,6 +87,8 @@ export const login = async (req, res, next) => {
       gender: userDetail.gender,
       teamId: userDetail.teamId,
       qId: userDetail.qId,
+      interest: userDetail.interestId.map((int) => int.content),
+      bio: individual?.description,
     };
 
     res
