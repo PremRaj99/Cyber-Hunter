@@ -57,7 +57,7 @@ export const createUserDetail = async (req, res, next) => {
     ) {
       return next(errorHandler(400, "Please fill all the required fields"));
     }
-    const isUserDetailexist = await UserDetail.findOne({ userId });
+    const isUserDetailexist = await UserDetail.findOne({ $or: [{ userId }, { qId }] });
     if (isUserDetailexist) {
       return next(errorHandler(400, "Your Details already exists."));
     }
