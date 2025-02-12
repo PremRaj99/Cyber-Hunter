@@ -122,6 +122,7 @@ export const createUserDetail = async (req, res, next) => {
       accessToken,
       refreshToken,
       name: userDetaildata.name,
+      qId: userDetaildata.qId,
       course: userDetaildata.course,
       session: userDetaildata.session,
       branch: userDetaildata.branch,
