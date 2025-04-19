@@ -4,8 +4,12 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import { ApiResponse } from "./utils/ApiResponse.js";
 import morgan from "morgan";
-// import path from "path";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -14,8 +18,9 @@ const app = express();
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
-app.use(express.static("public"));
 app.use(morgan("dev"));
+
+// Configure CORS for production
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "*",
@@ -42,14 +47,14 @@ app.use("/api/v1/techStack", techStackRoutes);
 app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
 
-app.get("/", (req, res) => {
-  res.send("Server is on development mode");
-});
-// app.use(express.static(path.join(__dirname, "../client/dist")));
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, "../../client/dist")));
 
-// app.get("*", (req, res) => {
-//   res.sendFile(path.join(__dirname, "../client", "dist", "index.html"));
-// });
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
+});
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
