@@ -2,6 +2,7 @@ import express from "express";
 import {
   login,
   logout,
+  google,
   refreshToken,
   sendEmailRequest,
   signup,
@@ -26,6 +27,8 @@ Router.get("/verify-email/:token", verifyJWT, verifyEmail);
 
 // signup
 Router.post("/signup", signup);
+
+Router.get("/google", google);
 
 // logout
 Router.post("/logout", verifyJWT, logout);

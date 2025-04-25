@@ -8,6 +8,7 @@ import generateCrypto from "../utils/generateCryptoCode.js";
 import { sendMail } from "../utils/mailHandler.js";
 import EmailVerification from "../models/EmailVerification.model.js";
 import Individual from "../models/Individual.model.js";
+import { googleUserResponse, oauth2Client } from "../utils/googleClient.js";
 
 export const test = (req, res) => {
   res.json({
@@ -58,7 +59,9 @@ export const login = async (req, res, next) => {
       userId: validEmail._id,
     }).populate("interestId", "content -_id");
 
-    const individual = await Individual.findOne({ userId: validEmail._id }).select("-_id -userId");
+    const individual = await Individual.findOne({
+      userId: validEmail._id,
+    }).select("-_id -userId");
 
     if (!userDetail) {
       return res
@@ -136,6 +139,83 @@ export const signup = async (req, res, next) => {
           "Signup Successful"
         )
       );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const google = async (req, res, next) => {
+  const { code } = req.query;
+
+  try {
+    const googleResponse = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(googleResponse.tokens);
+    const userInfo = await googleUserResponse(googleResponse);
+
+    let user = await User.findOne({ email: userInfo.email });
+
+    if (!user) {
+      user = new User({
+        email: userInfo.email,
+        emailVerified: true,
+        password: userInfo.id,
+      });
+      await user.save();
+    } else if (!user.emailVerified) {
+      user.emailVerified = true;
+      await user.save();
+    }
+
+    const userDetail = await UserDetail.findOne({
+      userId: user._id,
+    }).populate("interestId", "content -_id");
+
+    const individual = await Individual.findOne({
+      userId: user._id,
+    }).select("-_id -userId");
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+
+    const { password: pass, ...rest } = user._doc;
+
+    if (!userDetail) {
+      return res
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .status(200)
+        .json(
+          ApiResponse(
+            200,
+            { ...rest, accessToken, refreshToken },
+            "Login Successful"
+          )
+        );
+    }
+    const data = {
+      ...rest,
+      accessToken,
+      refreshToken,
+      name: userDetail.name,
+      course: userDetail.course,
+      session: userDetail.session,
+      branch: userDetail.branch,
+      profilePicture: userDetail.profilePicture,
+      DOB: userDetail.DOB,
+      phoneNumber: userDetail.phoneNumber,
+      gender: userDetail.gender,
+      teamId: userDetail.teamId,
+      qId: userDetail.qId,
+      interest: userDetail.interestId.map((int) => int.content),
+      bio: individual?.description,
+    };
+
+    res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(ApiResponse(200, data, "Google login successful"));
   } catch (error) {
     next(error);
   }

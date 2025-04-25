@@ -21,13 +21,15 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 
 // Configure CORS for production
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+// app.use(
+//   cors({
+//     origin: process.env.CORS_ORIGIN || "*",
+//     methods: ["GET", "POST", "PUT", "DELETE"],
+//     credentials: true,
+//   })
+// );
+
+app.use(cors());
 
 // import all router
 import authRoutes from "./routes/auth.route.js";
