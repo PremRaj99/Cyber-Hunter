@@ -47,7 +47,7 @@ Router.post(
 
 // update project
 Router.put(
-  "/:userId",
+  "/:projectId", // <-- Fix: use projectId instead of userId
   verifyJWT,
   upload.fields([
     {
@@ -66,7 +66,7 @@ Router.put(
 Router.delete("/:projectId", verifyJWT, deleteProject);
 
 // get all projects
-Router.get("/",verifyJWT, getProjects);
+Router.get("/", verifyJWT, getProjects);
 
 // get project
 Router.get("/:projectId", getProject);

@@ -39,6 +39,7 @@ import tagRoutes from "./routes/tag.route.js";
 import techStackRoutes from "./routes/techStack.route.js";
 import languageRoutes from "./routes/language.rotue.js";
 import interestRoutes from "./routes/interest.route.js";
+import individualRoutes from "./routes/individual.route.js";
 
 // define routes
 app.use("/api/v1/auth", authRoutes);
@@ -48,6 +49,7 @@ app.use("/api/v1/tag", tagRoutes);
 app.use("/api/v1/techStack", techStackRoutes);
 app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
+app.use("/api/v1/individual", individualRoutes);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, "../../client/dist")));

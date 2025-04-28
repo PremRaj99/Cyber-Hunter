@@ -57,7 +57,9 @@ export const createUserDetail = async (req, res, next) => {
     ) {
       return next(errorHandler(400, "Please fill all the required fields"));
     }
-    const isUserDetailexist = await UserDetail.findOne({ $or: [{ userId }, { qId }] });
+    const isUserDetailexist = await UserDetail.findOne({
+      $or: [{ userId }, { qId }],
+    });
     if (isUserDetailexist) {
       return next(errorHandler(400, "Your Details already exists."));
     }
@@ -109,7 +111,9 @@ export const createUserDetail = async (req, res, next) => {
     }
 
     // get interest for its id
-    const interest = await Interest.find({ _id: { $in: interestId } }).select("content -_id");
+    const interest = await Interest.find({ _id: { $in: interestId } }).select(
+      "content -_id"
+    );
 
     const validUser = await User.findById(userId);
     const { accessToken, refreshToken } =
@@ -144,43 +148,65 @@ export const createUserDetail = async (req, res, next) => {
     next(error);
   }
 };
-export const updateUser = async (req, res, next) => {
+export const updateUser = async (req, res) => {
   try {
-    const { id: userId } = req.user;
-    const { name, qId, course, session, branch, DOB, interestId, phoneNumber } =
-      req.body;
-    const userDetail = await UserDetail.findOne({ userId });
-    if (!userDetail) {
-      return next(errorHandler(404, "User Detail not found"));
+    const { userId } = req.params;
+
+    // Debug logs
+    console.log("Updating user with ID:", userId);
+    console.log("Request body:", req.body);
+
+    // Try to find the user first
+    const user = await User.findById(userId);
+
+    if (!user) {
+      console.log(`User with ID ${userId} not found`);
+      return res.status(404).json({
+        statusCode: 404,
+        data: null,
+        message: "User Detail not found",
+        success: false,
+      });
     }
 
+    // Process the update
     const profilePictureLocalPath = req.files?.profilePicture?.[0]?.path;
 
     let profilePictureUrl;
 
     if (profilePictureLocalPath) {
       const profilePicture = await uploadOnCloudinary(profilePictureLocalPath);
-      if (avatar) {
+      if (profilePicture) {
         profilePictureUrl = profilePicture.url;
       }
     }
 
-    userDetail.name = name || userDetail.name;
-    userDetail.qId = qId || userDetail.qId;
-    userDetail.course = course || userDetail.course;
-    userDetail.session = session || userDetail.session;
-    userDetail.branch = branch || userDetail.branch;
-    userDetail.DOB = DOB || userDetail.DOB;
-    userDetail.profilePicture = profilePictureUrl || userDetail.profilePicture;
-    userDetail.interestId = interestId || userDetail.interestId;
-    userDetail.phoneNumber = phoneNumber || userDetail.phoneNumber;
-    await userDetail.save();
+    user.name = req.body.name || user.name;
+    user.qId = req.body.qId || user.qId;
+    user.course = req.body.course || user.course;
+    user.session = req.body.session || user.session;
+    user.branch = req.body.branch || user.branch;
+    user.DOB = req.body.DOB || user.DOB;
+    user.profilePicture = profilePictureUrl || user.profilePicture;
+    user.interestId = req.body.interestId || user.interestId;
+    user.phoneNumber = req.body.phoneNumber || user.phoneNumber;
+    await user.save();
 
-    res
-      .status(200)
-      .json(ApiResponse(200, null, "User Detail updated successfully."));
+    // Return updated user
+    return res.status(200).json({
+      statusCode: 200,
+      data: user,
+      message: "User updated successfully",
+      success: true,
+    });
   } catch (error) {
-    next(error);
+    console.error("Error in updateUser:", error);
+    return res.status(500).json({
+      statusCode: 500,
+      data: null,
+      message: error.message || "Internal server error",
+      success: false,
+    });
   }
 };
 

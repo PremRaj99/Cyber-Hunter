@@ -1,4 +1,6 @@
 import Individual from "../models/Individual.model.js";
+import { errorHandler } from "../utils/error.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const createIndividual = async (req, res, next) => {
   try {
@@ -45,6 +47,21 @@ export const getIndividual = async (req, res, next) => {
     }
 
     res.status(200).json(individual);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Add this new function to fetch Individual by userId
+export const getIndividualByUserId = async (req, res, next) => {
+  try {
+    const individual = await Individual.findOne({ userId: req.params.userId });
+
+    if (!individual) {
+      return next(errorHandler(404, "Individual not found"));
+    }
+
+    res.status(200).json(ApiResponse(200, individual, "Individual fetched successfully"));
   } catch (error) {
     next(error);
   }
