@@ -7,6 +7,8 @@ import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import securityRouter from "./routes/security.route.js";
+import { trackDevice } from "./middlewares/deviceTracker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,6 +52,11 @@ app.use("/api/v1/techStack", techStackRoutes);
 app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
 app.use("/api/v1/individual", individualRoutes);
+
+// Apply device tracking after authentication middleware
+app.use(trackDevice);
+
+app.use("/api/v1/security", securityRouter);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, "../../client/dist")));

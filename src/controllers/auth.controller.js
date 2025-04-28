@@ -9,6 +9,7 @@ import { sendMail } from "../utils/mailHandler.js";
 import EmailVerification from "../models/EmailVerification.model.js";
 import Individual from "../models/Individual.model.js";
 import { googleUserResponse, oauth2Client } from "../utils/googleClient.js";
+import { recordLoginAttempt, registerDevice } from "./security.controller.js";
 
 export const test = (req, res) => {
   res.json({
@@ -37,6 +38,18 @@ export const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password || password === "") {
+    // Record failed login attempt
+    if (email) {
+      const user = await User.findOne({ email });
+      if (user) {
+        await recordLoginAttempt(
+          user._id,
+          req,
+          "failed",
+          "Missing credentials"
+        );
+      }
+    }
     return next(errorHandler(404, "All fields are required!"));
   }
 
@@ -44,12 +57,27 @@ export const login = async (req, res, next) => {
     const validEmail = await User.findOne({ email: email });
 
     if (!validEmail) {
+      await recordLoginAttempt(null, req, "failed", "User not found");
       return next(errorHandler(404, "User Not Found"));
     }
+
     const validPassword = bcryptjs.compareSync(password, validEmail.password);
     if (!validPassword) {
+      await recordLoginAttempt(
+        validEmail._id,
+        req,
+        "failed",
+        "Invalid password"
+      );
       return next(errorHandler(401, "Invalid Password"));
     }
+
+    // Record successful login
+    await recordLoginAttempt(validEmail._id, req, "success");
+
+    // Register device
+    const deviceData = await registerDevice(validEmail._id, req);
+
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       validEmail._id
     );
@@ -67,6 +95,14 @@ export const login = async (req, res, next) => {
       return res
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
+        .cookie("deviceId", deviceData.deviceId, {
+          ...options,
+          maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+        })
+        .cookie("deviceToken", deviceData.token, {
+          ...options,
+          maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+        })
         .status(200)
         .json(
           ApiResponse(
@@ -76,6 +112,7 @@ export const login = async (req, res, next) => {
           )
         );
     }
+
     const data = {
       ...rest,
       accessToken,
@@ -97,6 +134,14 @@ export const login = async (req, res, next) => {
     res
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
+      .cookie("deviceId", deviceData.deviceId, {
+        ...options,
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      })
+      .cookie("deviceToken", deviceData.token, {
+        ...options,
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      })
       .status(200)
       .json(ApiResponse(200, data, "Login Successful"));
   } catch (error) {
@@ -222,23 +267,35 @@ export const google = async (req, res, next) => {
 };
 
 export const logout = async (req, res, next) => {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        refreshToken: undefined,
-      },
-    },
-    {
-      new: true,
+  try {
+    // Remove current device
+    const deviceId = req.cookies.deviceId || req.headers["x-device-id"];
+    if (deviceId) {
+      await Device.findOneAndDelete({ deviceId, userId: req.user._id });
     }
-  );
 
-  res
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
-    .status(200)
-    .json(ApiResponse(200, {}, "Logout Successful"));
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          refreshToken: undefined,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    res
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .clearCookie("deviceId", options)
+      .clearCookie("deviceToken", options)
+      .status(200)
+      .json(ApiResponse(200, {}, "Logout Successful"));
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const refreshToken = async (req, res, next) => {
@@ -433,6 +490,90 @@ export const resetPassword = async (req, res, next) => {
     );
 
     res.status(200).json(ApiResponse(200, {}, "Password Reset Successful"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return next(
+        errorHandler(400, "Current password and new password are required")
+      );
+    }
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(errorHandler(404, "User not found"));
+    }
+
+    // Verify current password
+    const isPasswordValid = bcryptjs.compareSync(
+      currentPassword,
+      user.password
+    );
+    if (!isPasswordValid) {
+      return next(errorHandler(401, "Current password is incorrect"));
+    }
+
+    // Check if new password is same as old password
+    if (currentPassword === newPassword) {
+      return next(
+        errorHandler(400, "New password cannot be the same as current password")
+      );
+    }
+
+    // Hash the new password
+    const salt = bcryptjs.genSaltSync(10);
+    const hashedPassword = bcryptjs.hashSync(newPassword, salt);
+
+    // Update the password
+    user.password = hashedPassword;
+    await user.save();
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Password changed successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyPassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    const userId = req.user._id;
+
+    if (!password) {
+      return next(errorHandler(400, "Password is required"));
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(errorHandler(404, "User not found"));
+    }
+
+    // Verify the password
+    const isPasswordValid = bcryptjs.compareSync(password, user.password);
+    if (!isPasswordValid) {
+      return next(errorHandler(401, "Password is incorrect"));
+    }
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          { verified: true },
+          "Password verified successfully"
+        )
+      );
   } catch (error) {
     next(error);
   }

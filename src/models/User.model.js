@@ -1,8 +1,5 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-
-dotenv.config();
 
 const userSchema = new mongoose.Schema(
   {
@@ -27,6 +24,18 @@ const userSchema = new mongoose.Schema(
       emum: ["user", "vendor", "admin"],
     },
     refreshToken: {
+      type: String,
+    },
+
+    // Add 2FA fields if they don't already exist
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    twoFactorSecret: {
+      type: String,
+    },
+    twoFactorTempSecret: {
       type: String,
     },
   },
@@ -61,6 +70,4 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
-const User = mongoose.model("User", userSchema);
-
-export default User;
+export default mongoose.model("User", userSchema);
