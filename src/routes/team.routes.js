@@ -29,11 +29,14 @@ import {
   checkNotAlreadyMember,
   validateJoinRequest,
 } from "../middlewares/team.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
 
 // Team routes
-router.post("/", verifyJWT, createTeam);
+router.post("/", verifyJWT, upload.fields([
+  { name: "TeamLogo", maxCount: 1 },
+]), createTeam);
 router.get("/", verifyJWT, getUserTeams);
 router.get("/all", verifyJWT, getAllTeams);
 router.get("/leaderboard", verifyJWT, getTeamLeaderboard);

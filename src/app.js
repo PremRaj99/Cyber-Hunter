@@ -9,7 +9,6 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import securityRouter from "./routes/security.route.js";
 import { trackDevice } from "./middlewares/deviceTracker.js";
-import teamRouter from "./routes/team.routes.js";
 import "./models/Acheivement.model.js"; // <-- Ensure this import is present
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +25,7 @@ app.use(morgan("dev"));
 
 // Configure CORS for production
 // app.use(
-//   cors({
+  //   cors({
 //     origin: process.env.CORS_ORIGIN || "*",
 //     methods: ["GET", "POST", "PUT", "DELETE"],
 //     credentials: true,
@@ -44,6 +43,7 @@ import techStackRoutes from "./routes/techStack.route.js";
 import languageRoutes from "./routes/language.rotue.js";
 import interestRoutes from "./routes/interest.route.js";
 import individualRoutes from "./routes/individual.route.js";
+import teamRouter from "./routes/team.routes.js";
 
 // define routes
 app.use("/api/v1/auth", authRoutes);
