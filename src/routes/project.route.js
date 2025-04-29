@@ -7,6 +7,10 @@ import {
   getProject,
   getProjects,
   updateProject,
+  createTeamProject,
+  getTeamProjects,
+  updateTeamProject,
+  deleteTeamProject,
 } from "../controllers/project.controller.js";
 
 const Router = express.Router();
@@ -70,5 +74,42 @@ Router.get("/", verifyJWT, getProjects);
 
 // get project
 Router.get("/:projectId", getProject);
+
+// Team project routes - specifically for team projects
+Router.post(
+  "/team",
+  verifyJWT,
+  upload.fields([
+    {
+      name: "projectImage",
+      maxCount: 5,
+    },
+    {
+      name: "projectThumbnail",
+      maxCount: 1,
+    },
+  ]),
+  createTeamProject
+);
+
+Router.get("/team/:teamId", verifyJWT, getTeamProjects);
+
+Router.put(
+  "/team/:projectId",
+  verifyJWT,
+  upload.fields([
+    {
+      name: "projectImage",
+      maxCount: 5,
+    },
+    {
+      name: "projectThumbnail",
+      maxCount: 1,
+    },
+  ]),
+  updateTeamProject
+);
+
+Router.delete("/team/:projectId", verifyJWT, deleteTeamProject);
 
 export default Router;

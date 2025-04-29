@@ -9,6 +9,8 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import securityRouter from "./routes/security.route.js";
 import { trackDevice } from "./middlewares/deviceTracker.js";
+import teamRouter from "./routes/team.routes.js";
+import "./models/Acheivement.model.js"; // <-- Ensure this import is present
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,6 +54,7 @@ app.use("/api/v1/techStack", techStackRoutes);
 app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
 app.use("/api/v1/individual", individualRoutes);
+app.use("/api/v1/team", teamRouter);
 
 // Apply device tracking after authentication middleware
 app.use(trackDevice);

@@ -6,12 +6,20 @@ import {
   getUser,
   getUsers,
   updateUser,
+  searchUsers,
+  getCurrentUser, // Add the new controller function
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const Router = express.Router();
 
 // define router
+
+// Get current user (me) - Add this new route first
+Router.get("/me", verifyJWT, getCurrentUser);
+
+// Search users route
+Router.get("/search", verifyJWT, searchUsers);
 
 // create user detail
 Router.post(

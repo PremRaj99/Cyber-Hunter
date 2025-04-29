@@ -9,6 +9,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import options from "../utils/cookieOptions.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
 import Interest from "../models/Interest.model.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -226,50 +228,80 @@ export const deleteUser = async (req, res, next) => {
 export const getUser = async (req, res, next) => {
   const { userId } = req.params;
   try {
+    // Improved validation for userId parameter
+    if (
+      !userId ||
+      userId === "undefined" ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID provided",
+        statusCode: 400,
+      });
+    }
+
+    // First find the user to make sure it exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        statusCode: 404,
+      });
+    }
+
+    // Get UserDetail for this user
     const userDetail = await UserDetail.findOne({ userId });
+
+    // Get Individual data if it exists
     const individual = await Individual.findOne({ userId });
 
     if (!individual) {
-      return next(errorHandler(404, "Individual not found"));
+      return res.status(404).json({
+        success: false,
+        message: "Individual profile not found",
+        statusCode: 404,
+      });
     }
+
     const projects = await Project.find({
       status: "active",
-      _id: { $in: individual.projectId },
+      _id: { $in: individual.projectId || [] },
     });
 
     const techStackIds = projects.map((project) => project.techStack).flat();
     const languageIds = projects.map((project) => project.language).flat();
 
-    const techStack = await TechStack.find({ _id: { $in: techStackIds } });
-    const language = await Language.find({ _id: { $in: languageIds } });
+    const techStack = await TechStack.find({
+      _id: { $in: techStackIds.filter((id) => id) }, // Filter out any undefined/null values
+    });
 
-    // const individualRank = await Individual.find()
-    //   .sort({ point: -1 })
-    //   .select("userId");
-
-    // const userIds = individualRank.map((ind) => ind.userId);
-    // const rank = userIds.indexOf(userId) + 1;
-    // const rank = individualRank.indexOf(userId) + 1;
+    const language = await Language.find({
+      _id: { $in: languageIds.filter((id) => id) }, // Filter out any undefined/null values
+    });
 
     const individualRank = await Individual.find()
       .sort({ point: -1 })
       .select("userId")
       .lean();
+
     const userIds = individualRank.map((ind) => ind.userId.toString());
     const rank = userIds.indexOf(userId.toString()) + 1;
 
     const data = {
-      ...userDetail.toObject(),
-      description: individual.description,
-      point: individual.point,
-      rank,
-      techStack,
-      language,
-      projects,
+      ...(userDetail ? userDetail.toObject() : {}),
+      description: individual?.description || "",
+      point: individual?.point || 0,
+      rank: rank || 0,
+      techStack: techStack || [],
+      language: language || [],
+      projects: projects || [],
     };
 
     res.status(200).json(data);
   } catch (error) {
+    console.error("Error in getUser:", error);
     next(error);
   }
 };
@@ -284,3 +316,90 @@ export const getUsers = async (req, res, next) => {
     next(error);
   }
 };
+
+// Add the search users function
+export const searchUsers = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res
+        .status(200)
+        .json(
+          ApiResponse(
+            200,
+            [],
+            "Please provide at least 2 characters for search"
+          )
+        );
+    }
+
+    // Search for users by name or email
+    const userDetails = await UserDetail.find({
+      $or: [
+        { name: { $regex: q, $options: "i" } }, // Case-insensitive name search
+        { qId: { $regex: q, $options: "i" } }, // Case-insensitive QID search
+      ],
+    })
+      .select("name qId profilePicture userId")
+      .populate({
+        path: "userId",
+        select: "email",
+      })
+      .limit(10); // Limit to 10 results for performance
+
+    // Format the results to include user details and email
+    const formattedResults = userDetails.map((user) => ({
+      _id: user.userId._id,
+      name: user.name,
+      qId: user.qId,
+      email: user.userId.email,
+      profilePicture: user.profilePicture,
+    }));
+
+    res
+      .status(200)
+      .json(ApiResponse(200, formattedResults, "Users search results"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get current user (me)
+export const getCurrentUser = asyncHandler(async (req, res) => {
+  try {
+    // Ensure user ID exists in req.user
+    if (!req.user || !req.user._id) {
+      throw new ApiError(401, "Authentication required");
+    }
+
+    const userId = req.user._id;
+
+    // Get user data
+    const user = await User.findById(userId).select("-password");
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Get user details
+    const userDetail = await UserDetail.findOne({ userId }).select("-__v");
+
+    // Get individual data if it exists
+    const individual = await Individual.findOne({ userId }).select("-__v");
+
+    // Combine the data
+    const userData = {
+      ...user.toObject(),
+      ...(userDetail ? userDetail.toObject() : {}),
+      bio: individual?.description || "",
+      individualId: individual?._id || null,
+    };
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, userData, "User data fetched successfully"));
+  } catch (error) {
+    console.error("Error in getCurrentUser:", error);
+    throw new ApiError(500, "Error fetching user data");
+  }
+});

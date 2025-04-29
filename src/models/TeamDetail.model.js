@@ -22,7 +22,22 @@ const TeamDetailSchema = new mongoose.Schema(
       type: String,
     },
     TeamMembers: {
-      type: [{ type: mongoose.Schema.Types.Mixed }],
+      type: [
+        {
+          userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          role: { type: String, default: "Member" },
+          status: { type: String, default: "Active" },
+          points: { type: Number, default: 0 },
+          skills: [String],
+          social: {
+            github: String,
+            linkedin: String,
+            twitter: String,
+            instagram: String,
+            dribbble: String,
+          },
+        },
+      ],
       default: [],
       required: true,
       validate: {
@@ -35,16 +50,26 @@ const TeamDetailSchema = new mongoose.Schema(
     projectId: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
       default: [],
-      unique: true,
     },
     achievementId: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Achievement" }],
       default: [],
-      unique: true,
     },
-    point: {
+    points: {
       type: Number,
       default: 0,
+    },
+    techStack: {
+      type: [String],
+      default: [],
+    },
+    fieldOfExcellence: {
+      type: [{ field: String, level: Number }],
+      default: [],
+    },
+    interests: {
+      type: [String],
+      default: [],
     },
     tagId: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag" }],
@@ -53,6 +78,31 @@ const TeamDetailSchema = new mongoose.Schema(
     badgeId: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Badge" }],
       default: [],
+    },
+    chatMessages: {
+      type: [
+        {
+          userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          message: String,
+          timestamp: { type: Date, default: Date.now },
+          reactions: [String],
+          attachments: [String],
+        },
+      ],
+      default: [],
+    },
+    channels: {
+      type: [
+        {
+          name: String,
+          description: String,
+          isActive: { type: Boolean, default: true },
+          createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        },
+      ],
+      default: [
+        { name: "general", description: "General discussion", isActive: true },
+      ],
     },
   },
   { timestamps: true }

@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const acheivementSchema = new mongoose.Schema(
+const achievementSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -53,6 +53,6 @@ const acheivementSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Acheivement = mongoose.model("Acheivement", acheivementSchema);
-
-export default Acheivement;
+// Register as "Achievement" (correct spelling)
+const Achievement = mongoose.model("Achievement", achievementSchema);
+export default Achievement;
