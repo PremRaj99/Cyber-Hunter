@@ -188,17 +188,36 @@ export const recordLoginAttempt = async (
     const ip =
       req.ip || req.headers["x-forwarded-for"]?.split(",")[0] || "Unknown IP";
 
-    // Get location from IP (you might want to use a service like ip-api.com)
+    // Get location from IP with safe fallback
     let location = "Unknown Location";
     try {
-      const ipResponse = await axios.get(`http://ip-api.com/json/${ip}`);
-      if (ipResponse.data.status === "success") {
-        location =
-          `${ipResponse.data.city || ""}, ${ipResponse.data.country || ""}`.trim();
-        if (!location) location = "Unknown Location";
+      // Set a reasonable timeout for IP lookup (2 seconds)
+      const ipResponse = await axios
+        .get(`http://ip-api.com/json/${ip}`, {
+          timeout: 2000,
+        })
+        .catch((err) => {
+          // If connection fails, try alternative service
+          return axios
+            .get(`https://ipapi.co/${ip}/json/`, {
+              timeout: 2000,
+            })
+            .catch(() => null);
+        });
+
+      if (ipResponse?.data) {
+        if (ipResponse.data.status === "success" || ipResponse.data.city) {
+          // Format for ip-api.com or ipapi.co response
+          const city = ipResponse.data.city || "";
+          const country =
+            ipResponse.data.country || ipResponse.data.country_name || "";
+          location = `${city}${city && country ? ", " : ""}${country}`.trim();
+          if (!location) location = "Unknown Location";
+        }
       }
     } catch (error) {
-      console.error("Error fetching location data:", error);
+      // Silent fail - just use default "Unknown Location"
+      console.log("IP geolocation service unavailable, using default location");
     }
 
     const deviceInfo = `${device} (${browser})`;
@@ -253,17 +272,36 @@ export const registerDevice = async (userId, req) => {
     const ip =
       req.ip || req.headers["x-forwarded-for"]?.split(",")[0] || "Unknown IP";
 
-    // Get location from IP
+    // Get location from IP with safe fallback
     let location = "Unknown Location";
     try {
-      const ipResponse = await axios.get(`http://ip-api.com/json/${ip}`);
-      if (ipResponse.data.status === "success") {
-        location =
-          `${ipResponse.data.city || ""}, ${ipResponse.data.country || ""}`.trim();
-        if (!location) location = "Unknown Location";
+      // Set a reasonable timeout for IP lookup (2 seconds)
+      const ipResponse = await axios
+        .get(`http://ip-api.com/json/${ip}`, {
+          timeout: 2000,
+        })
+        .catch((err) => {
+          // If connection fails, try alternative service
+          return axios
+            .get(`https://ipapi.co/${ip}/json/`, {
+              timeout: 2000,
+            })
+            .catch(() => null);
+        });
+
+      if (ipResponse?.data) {
+        if (ipResponse.data.status === "success" || ipResponse.data.city) {
+          // Format for ip-api.com or ipapi.co response
+          const city = ipResponse.data.city || "";
+          const country =
+            ipResponse.data.country || ipResponse.data.country_name || "";
+          location = `${city}${city && country ? ", " : ""}${country}`.trim();
+          if (!location) location = "Unknown Location";
+        }
       }
     } catch (error) {
-      console.error("Error fetching location data:", error);
+      // Silent fail - just use default "Unknown Location"
+      console.log("IP geolocation service unavailable, using default location");
     }
 
     // Generate device ID and token

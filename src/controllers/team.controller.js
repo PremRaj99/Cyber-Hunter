@@ -14,9 +14,14 @@ const createTeam = asyncHandler(async (req, res) => {
   console.log("Received team creation request:", req.body);
 
   // Validate input
-  if (!TeamName) {
-    throw new ApiError(400, "Team name is required");
-  }
+  // if (!TeamName) {
+  //   throw new ApiError(400, "Team name is required");
+  // }
+
+  // Check if the request body is being properly parsed
+  console.log("Request body:", req.body);
+  console.log("Team name:", TeamName);
+  console.log("Files:", req.files);
 
   // Check if team name already exists
   const existingTeam = await TeamDetail.findOne({ TeamName });
@@ -251,7 +256,7 @@ const addTeamMember = asyncHandler(async (req, res) => {
     skills,
   });
 
-  await team.save;
+  await team.save();
 
   // Update user's team reference
   await User.findByIdAndUpdate(
@@ -349,7 +354,9 @@ const updateTechStack = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, team, "Tech stack updated successfully"));
 });
 
-// Add team message
+/**
+ * Add team message
+ */
 const addTeamMessage = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
   const { message, attachments = [] } = req.body;
@@ -691,6 +698,240 @@ const getTeamChannelMessages = async (req, res, next) => {
   }
 };
 
+/**
+ * Request to join a team
+ * @route POST /api/v1/team/:teamId/join-request
+ */
+const requestToJoinTeam = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const { message = "" } = req.body;
+
+  // Team existence is already checked by middleware
+  const team = await TeamDetail.findById(teamId);
+
+  // Check if team is full
+  if (team.TeamMembers.length >= 5) {
+    throw new ApiError(400, "Team is already full (5 members maximum)");
+  }
+
+  // Add join request
+  team.joinRequests.push({
+    userId: req.user._id,
+    message,
+    status: "pending",
+    requestedAt: new Date(),
+  });
+
+  await team.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { requestId: team.joinRequests[team.joinRequests.length - 1]._id },
+        "Join request sent successfully"
+      )
+    );
+});
+
+/**
+ * Get all pending join requests for a team
+ * @route GET /api/v1/team/:teamId/join-requests
+ */
+const getTeamJoinRequests = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const { status = "pending" } = req.query;
+
+  // Team existence and creator authorization is checked by middleware
+  const team = await TeamDetail.findById(teamId);
+
+  // Filter requests by status if provided
+  const requests = team.joinRequests.filter(
+    (req) => !status || req.status === status
+  );
+
+  // Populate user details for each request
+  const populatedRequests = await Promise.all(
+    requests.map(async (request) => {
+      try {
+        // Get basic user information
+        const user = await User.findById(request.userId).select(
+          "email profilePicture"
+        );
+        const userDetail = await UserDetail.findOne({
+          userId: request.userId,
+        }).select("name");
+
+        return {
+          _id: request._id,
+          userId: request.userId,
+          message: request.message,
+          status: request.status,
+          requestedAt: request.requestedAt,
+          userData: {
+            name: userDetail?.name || "Unknown",
+            email: user?.email || "Unknown",
+            profilePicture: user?.profilePicture || null,
+          },
+        };
+      } catch (error) {
+        console.error("Error populating user details:", error);
+        return request;
+      }
+    })
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        populatedRequests,
+        "Team join requests fetched successfully"
+      )
+    );
+});
+
+/**
+ * Respond to a join request (accept/reject)
+ * @route PUT /api/v1/team/:teamId/join-request/:requestId
+ */
+const respondToJoinRequest = asyncHandler(async (req, res) => {
+  const { teamId, requestId } = req.params;
+  const { status } = req.body;
+
+  if (!status || !["accepted", "rejected"].includes(status)) {
+    throw new ApiError(400, "Invalid status. Must be 'accepted' or 'rejected'");
+  }
+
+  const team = await TeamDetail.findById(teamId);
+
+  // Find the request
+  const requestIndex = team.joinRequests.findIndex(
+    (req) => req._id.toString() === requestId
+  );
+
+  if (requestIndex === -1) {
+    throw new ApiError(404, "Join request not found");
+  }
+
+  const joinRequest = team.joinRequests[requestIndex];
+
+  // Check if the team is full before accepting
+  if (status === "accepted" && team.TeamMembers.length >= 5) {
+    throw new ApiError(
+      400,
+      "Cannot accept request. Team is already full (5 members maximum)"
+    );
+  }
+
+  // Update the request status
+  team.joinRequests[requestIndex].status = status;
+  team.joinRequests[requestIndex].respondedAt = new Date();
+
+  if (status === "accepted") {
+    // Add user to team
+    team.TeamMembers.push({
+      userId: joinRequest.userId,
+      role: "Member",
+      status: "Active",
+      points: 0,
+    });
+
+    // Update user's team reference
+    await User.findByIdAndUpdate(
+      joinRequest.userId,
+      { $set: { teamId: team._id } },
+      { new: true }
+    );
+
+    // Also update UserDetail
+    await UserDetail.findOneAndUpdate(
+      { userId: joinRequest.userId },
+      { $set: { teamId: team._id } }
+    );
+  }
+
+  await team.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { requestId, status }, `Join request ${status}`)
+    );
+});
+
+/**
+ * Get all teams with pending join requests for the current user
+ * @route GET /api/v1/team/my-join-requests
+ */
+const getUserJoinRequests = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  // Find teams where the user has pending join requests
+  const teams = await TeamDetail.find({
+    joinRequests: {
+      $elemMatch: {
+        userId: userId,
+      },
+    },
+  }).select("TeamName TeamLogo TeamDescription teamCreaterId joinRequests");
+
+  // Extract and format the join requests for each team
+  const userRequests = teams.map((team) => {
+    const userRequest = team.joinRequests.find(
+      (req) => req.userId.toString() === userId.toString()
+    );
+
+    return {
+      teamId: team._id,
+      teamName: team.TeamName,
+      teamLogo: team.TeamLogo,
+      requestId: userRequest._id,
+      status: userRequest.status,
+      requestedAt: userRequest.requestedAt,
+      respondedAt: userRequest.respondedAt,
+    };
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        userRequests,
+        "User join requests fetched successfully"
+      )
+    );
+});
+
+/**
+ * Cancel a join request
+ * @route DELETE /api/v1/team/:teamId/join-request
+ */
+const cancelJoinRequest = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const userId = req.user._id;
+
+  const team = await TeamDetail.findById(teamId);
+
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
+
+  // Filter out the user's request
+  team.joinRequests = team.joinRequests.filter(
+    (request) => request.userId.toString() !== userId.toString()
+  );
+
+  await team.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Join request cancelled successfully"));
+});
+
 export {
   createTeam,
   getAllTeams,
@@ -703,6 +944,11 @@ export {
   getTeamLeaderboard,
   deleteTeam,
   getUserTeams,
-  getTeamWithMembers, // Add the new function to exports
-  getTeamChannelMessages, // This was already exported separately
+  getTeamWithMembers,
+  getTeamChannelMessages,
+  requestToJoinTeam,
+  getTeamJoinRequests,
+  respondToJoinRequest,
+  getUserJoinRequests,
+  cancelJoinRequest,
 };

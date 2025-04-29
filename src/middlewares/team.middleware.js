@@ -55,3 +55,60 @@ export const hasAvailableSlots = asyncHandler(async (req, res, next) => {
 
   next();
 });
+
+// Middleware to check if user has already sent a request to this team
+export const checkExistingJoinRequest = asyncHandler(async (req, res, next) => {
+  const { teamId } = req.params;
+  const userId = req.user._id;
+
+  const team = await TeamDetail.findById(teamId);
+
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
+
+  const hasExistingRequest = team.joinRequests.some(
+    (request) => request.userId.toString() === userId.toString()
+  );
+
+  if (hasExistingRequest) {
+    throw new ApiError(409, "You have already requested to join this team");
+  }
+
+  next();
+});
+
+// Middleware to check if user is already a member of the team
+export const checkNotAlreadyMember = asyncHandler(async (req, res, next) => {
+  const { teamId } = req.params;
+  const userId = req.user._id;
+
+  const team = await TeamDetail.findById(teamId);
+
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
+
+  const isAlreadyMember = team.TeamMembers.some(
+    (member) => member.userId.toString() === userId.toString()
+  );
+
+  if (isAlreadyMember) {
+    throw new ApiError(409, "You are already a member of this team");
+  }
+
+  next();
+});
+
+// Middleware to validate join request
+export const validateJoinRequest = asyncHandler(async (req, res, next) => {
+  const { requestId } = req.params;
+
+  if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(400, "Invalid join request ID");
+  }
+
+  // We'll check if the request exists in the controller since we need the team context
+
+  next();
+});
