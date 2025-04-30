@@ -1,12 +1,12 @@
+import asyncHandler from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 import ApiError from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import TeamDetail from "../models/TeamDetail.model.js";
 import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
-import Individual from "../models/Individual.model.js";
-import mongoose from "mongoose";
-import asyncHandler from "../utils/asyncHandler.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
+import { errorHandler } from "../utils/error.js";
 
 // Create a new team
 const createTeam = asyncHandler(async (req, res) => {
@@ -133,23 +133,74 @@ const getAllTeams = asyncHandler(async (req, res) => {
 const getTeamById = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
+  // Validate MongoDB ID format
   if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
-    throw new ApiError(400, "Invalid team ID");
+    return res.status(400).json({
+      success: false,
+      message: "Invalid team ID format",
+    });
   }
 
-  const team = await TeamDetail.findById(teamId)
-    .populate("TeamCreaterId", "username email avatar")
-    .populate("TeamMembers.userId", "name email profilePicture") // <-- populate user details for each member
-    .populate("projectId") // <-- populate project details
-    .populate("achievementId");
+  try {
+    const team = await TeamDetail.findById(teamId)
+      .populate("TeamCreaterId", "username email avatar profilePicture")
+      .populate({
+        path: "TeamMembers.userId",
+        model: "User",
+        select: "email profilePicture phoneNumber",
+      })
+      .populate("projectId")
+      .populate("achievementId");
 
-  if (!team) {
-    throw new ApiError(404, "Team not found");
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: "Team not found",
+      });
+    }
+
+    // Enhance team members with UserDetail info for each member
+    const enhancedTeamMembers = await Promise.all(
+      team.TeamMembers.map(async (member) => {
+        // Get additional user details from UserDetail model
+        const userDetail = await UserDetail.findOne({
+          userId: member.userId._id,
+        }).select("name phoneNumber");
+
+        return {
+          _id: member._id,
+          userId: member.userId._id,
+          role: member.role,
+          status: member.status,
+          points: member.points || 0,
+          email: member.userId.email,
+          profilePicture: member.userId.profilePicture,
+          phoneNumber: member.userId.phoneNumber || userDetail?.phoneNumber,
+          name:
+            userDetail?.name ||
+            (member.userId.email
+              ? member.userId.email.split("@")[0]
+              : "Unknown User"),
+          skills: member.skills || [],
+          social: member.social || {},
+        };
+      })
+    );
+
+    // Replace the team members with our enhanced data
+    const teamResponse = team.toObject();
+    teamResponse.TeamMembers = enhancedTeamMembers;
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, teamResponse, "Team fetched successfully"));
+  } catch (error) {
+    console.error(`Error fetching team ${teamId}:`, error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch team data due to server error",
+    });
   }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, team, "Team fetched successfully"));
 });
 
 // Update team
@@ -203,71 +254,86 @@ const updateTeam = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, team, "Team updated successfully"));
 });
 
-// Add team member
+/**
+ * Add a member to team (for team leader use)
+ * @route POST /api/v1/team/:teamId/members
+ */
 const addTeamMember = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
-  const { userId, role = "Member", skills = [] } = req.body;
+  const { userId } = req.body;
 
-  if (
-    !teamId ||
-    !mongoose.Types.ObjectId.isValid(teamId) ||
-    !userId ||
-    !mongoose.Types.ObjectId.isValid(userId)
-  ) {
-    throw new ApiError(400, "Invalid team ID or user ID");
+  if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
+    throw new ApiError(400, "Invalid team ID");
   }
 
-  const team = await TeamDetail.findById(teamId);
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
 
+  // Find the team
+  const team = await TeamDetail.findById(teamId);
   if (!team) {
     throw new ApiError(404, "Team not found");
   }
 
-  // Only team creator can add members
+  // Check if the requesting user is the team creator
   if (team.TeamCreaterId.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not authorized to update this team");
+    throw new ApiError(403, "You are not authorized to add team members");
   }
 
-  // Check if user exists
-  const user = await User.findById(userId);
-  if (!user) {
+  // Check if team is full
+  if (team.TeamMembers.length >= 5) {
+    throw new ApiError(400, "Team is already full (5 members maximum)");
+  }
+
+  // Check if user already belongs to a team
+  const userToAdd = await User.findById(userId);
+  if (!userToAdd) {
     throw new ApiError(404, "User not found");
   }
 
-  // Check if user is already in team
-  if (team.TeamMembers.some((member) => member.userId.toString() === userId)) {
-    throw new ApiError(409, "User is already a team member");
+  if (userToAdd.teamId) {
+    throw new ApiError(400, "User already belongs to a team");
   }
 
-  // Check if team already has 5 members
-  if (team.TeamMembers.length >= 5) {
-    throw new ApiError(
-      400,
-      "Team already has the maximum number of members (5)"
-    );
+  // Check if user is already a member of this team
+  const isAlreadyMember = team.TeamMembers.some(
+    (member) => member.userId.toString() === userId
+  );
+
+  if (isAlreadyMember) {
+    throw new ApiError(409, "User is already a member of this team");
   }
 
-  // Add member to team
+  // Add user to team
   team.TeamMembers.push({
     userId,
-    role,
+    role: "Member",
     status: "Active",
     points: 0,
-    skills,
   });
 
-  await team.save();
-
-  // Update user's team reference
+  // Update the user's team reference
   await User.findByIdAndUpdate(
     userId,
     { $set: { teamId: team._id } },
     { new: true }
   );
 
+  // Update UserDetail
+  await UserDetail.findOneAndUpdate({ userId }, { $set: { teamId: team._id } });
+
+  await team.save();
+
   return res
     .status(200)
-    .json(new ApiResponse(200, team, "Team member added successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        { teamId, userId },
+        "User added to team successfully"
+      )
+    );
 });
 
 // Remove team member
@@ -513,87 +579,79 @@ const getTeamWithMembers = asyncHandler(async (req, res) => {
   // Enhanced approach: Collect all member IDs
   const memberIds = team.TeamMembers.map((member) => member.userId);
 
-  // Fetch only the essential user data we need
-  const [userData, userDetailData, individualData] = await Promise.all([
-    // Get email and profilePicture from user collection
-    User.find({ _id: { $in: memberIds } })
-      .select("_id email profilePicture")
-      .lean(),
+  try {
+    // Fetch only the essential user data we need
+    const [userData, userDetailData] = await Promise.all([
+      // Get email and profilePicture from user collection
+      User.find({ _id: { $in: memberIds } })
+        .select("_id email profilePicture")
+        .lean(),
 
-    // Get name and interests from UserDetail collection
-    UserDetail.find({ userId: { $in: memberIds } })
-      .select("userId name interests profilePicture") // Add profilePicture from UserDetail as well
-      .lean(),
+      // Get name and interests from UserDetail collection
+      UserDetail.find({ userId: { $in: memberIds } })
+        .select("userId name interests profilePicture") // Add profilePicture from UserDetail as well
+        .lean(),
+    ]);
 
-    // Get only points from individual profiles
-    Individual.find({ userId: { $in: memberIds } })
-      .select("userId point")
-      .lean(),
-  ]);
+    // Map the minimal data we need for each team member
+    const enhancedTeamMembers = team.TeamMembers.map((member) => {
+      // Find related data for this member
+      const user = userData.find(
+        (u) => u._id.toString() === member.userId.toString()
+      );
 
-  // Map the minimal data we need for each team member
-  const enhancedTeamMembers = team.TeamMembers.map((member) => {
-    // Find related data for this member
-    const user = userData.find(
-      (u) => u._id.toString() === member.userId.toString()
-    );
+      const userDetail = userDetailData.find(
+        (ud) => ud.userId && ud.userId.toString() === member.userId.toString()
+      );
 
-    const userDetail = userDetailData.find(
-      (ud) => ud.userId && ud.userId.toString() === member.userId.toString()
-    );
+      // Check for profile picture in both User and UserDetail
+      const profilePicture = user?.profilePicture || userDetail?.profilePicture;
 
-    const indivData = individualData.find(
-      (ind) => ind.userId && ind.userId.toString() === member.userId.toString()
-    );
+      // Return only the fields you specifically need
+      return {
+        _id: member._id,
+        userId: member.userId,
+        role: member.role,
+        status: member.status,
+        points: member.points || 0,
+        skills: member.skills || [],
+        social: member.social || {},
 
-    // Check for profile picture in both User and UserDetail
-    const profilePicture = user?.profilePicture || userDetail?.profilePicture;
+        // User data - include profile picture if available
+        userData: {
+          email: user?.email,
+          profilePicture: profilePicture,
+        },
 
-    // Return only the fields you specifically need
-    return {
-      _id: member._id,
-      userId: member.userId,
-      role: member.role,
-      status: member.status,
-      points: member.points || 0,
-      skills: member.skills || [],
-      social: member.social || {},
+        // UserDetail data - name and interests
+        userDetailData: userDetail
+          ? {
+              name: userDetail.name,
+              interests: userDetail.interests || [],
+            }
+          : null,
+      };
+    });
 
-      // User data - include profile picture if available
-      userData: {
-        email: user?.email,
-        profilePicture: profilePicture,
-      },
+    // Replace the team members with our enhanced but minimal data
+    team.TeamMembers = enhancedTeamMembers;
 
-      // UserDetail data - name and interests
-      userDetailData: userDetail
-        ? {
-            name: userDetail.name,
-            interests: userDetail.interests || [],
-          }
-        : null,
-
-      // Individual data - just points
-      individualData: indivData
-        ? {
-            point: indivData.point || 0,
-          }
-        : { point: 0 },
-    };
-  });
-
-  // Replace the team members with our enhanced but minimal data
-  team.TeamMembers = enhancedTeamMembers;
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        team,
-        "Team with comprehensive member information fetched successfully"
-      )
-    );
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          team,
+          "Team with comprehensive member information fetched successfully"
+        )
+      );
+  } catch (error) {
+    console.error("Error in getTeamWithMembers:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch team member details",
+    });
+  }
 });
 
 /**
@@ -703,62 +761,130 @@ const getTeamChannelMessages = async (req, res, next) => {
  * @route POST /api/v1/team/:teamId/join-request
  */
 const requestToJoinTeam = asyncHandler(async (req, res) => {
-  const { teamId } = req.params;
-  const { message = "" } = req.body;
+  try {
+    const { teamId } = req.params;
+    const { message = "" } = req.body;
 
-  // Team existence is already checked by middleware
-  const team = await TeamDetail.findById(teamId);
+    // Extra safety check for team existence
+    const team = await TeamDetail.findById(teamId);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        message: "Team not found",
+      });
+    }
 
-  // Check if team is full
-  if (team.TeamMembers.length >= 5) {
-    throw new ApiError(400, "Team is already full (5 members maximum)");
+    // Check if team is full - ensure TeamMembers exists and is an array
+    if (
+      team.TeamMembers &&
+      Array.isArray(team.TeamMembers) &&
+      team.TeamMembers.length >= 5
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Team is already full (5 members maximum)",
+      });
+    }
+
+    // Double-check user isn't already a member - handle case if TeamMembers is undefined
+    const isMember =
+      team.TeamMembers && Array.isArray(team.TeamMembers)
+        ? team.TeamMembers.some(
+            (member) => member.userId.toString() === req.user._id.toString()
+          )
+        : false;
+
+    if (isMember) {
+      return res.status(409).json({
+        success: false,
+        message: "You are already a member of this team",
+      });
+    }
+
+    // Double-check for existing request - ensure joinRequests exists and is an array
+    const joinRequests = team.joinRequests || [];
+    const existingRequest = joinRequests.find
+      ? joinRequests.find(
+          (request) => request.userId.toString() === req.user._id.toString()
+        )
+      : undefined;
+
+    if (existingRequest) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already requested to join this team",
+      });
+    }
+
+    // Initialize joinRequests if it doesn't exist
+    if (!team.joinRequests) {
+      team.joinRequests = [];
+    }
+
+    // Add join request with proper error handling
+    team.joinRequests.push({
+      userId: req.user._id,
+      message,
+      status: "pending",
+      requestedAt: new Date(),
+    });
+
+    await team.save();
+
+    return res.status(200).json({
+      success: true,
+      data: { requestId: team.joinRequests[team.joinRequests.length - 1]._id },
+      message: "Join request sent successfully",
+    });
+  } catch (error) {
+    console.error("Error in requestToJoinTeam:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while processing join request",
+    });
   }
-
-  // Add join request
-  team.joinRequests.push({
-    userId: req.user._id,
-    message,
-    status: "pending",
-    requestedAt: new Date(),
-  });
-
-  await team.save();
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { requestId: team.joinRequests[team.joinRequests.length - 1]._id },
-        "Join request sent successfully"
-      )
-    );
 });
 
 /**
  * Get all pending join requests for a team
  * @route GET /api/v1/team/:teamId/join-requests
  */
-const getTeamJoinRequests = asyncHandler(async (req, res) => {
-  const { teamId } = req.params;
-  const { status = "pending" } = req.query;
+const getTeamJoinRequests = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
 
-  // Team existence and creator authorization is checked by middleware
-  const team = await TeamDetail.findById(teamId);
+    // Find the team and validate ownership
+    const team = await TeamDetail.findById(teamId);
 
-  // Filter requests by status if provided
-  const requests = team.joinRequests.filter(
-    (req) => !status || req.status === status
-  );
+    if (!team) {
+      return next(errorHandler(404, "Team not found"));
+    }
 
-  // Populate user details for each request
-  const populatedRequests = await Promise.all(
-    requests.map(async (request) => {
-      try {
-        // Get basic user information
+    // Check if user is authorized to view team requests
+    const isTeamLeader = team.TeamMembers.some(
+      (member) =>
+        member.userId.toString() === req.user._id.toString() &&
+        member.role === "Leader"
+    );
+
+    if (!isTeamLeader) {
+      return next(
+        errorHandler(403, "Only team leaders can view join requests")
+      );
+    }
+
+    // Get join requests and populate with user data
+    const joinRequests = team.joinRequests;
+
+    // Populate each request with user data
+    const populatedRequests = await Promise.all(
+      joinRequests.map(async (request) => {
+        // Find basic user data
         const user = await User.findById(request.userId).select(
           "email profilePicture"
         );
+
+        // Find user details for name and additional info
         const userDetail = await UserDetail.findOne({
           userId: request.userId,
         }).select("name");
@@ -769,29 +895,26 @@ const getTeamJoinRequests = asyncHandler(async (req, res) => {
           message: request.message,
           status: request.status,
           requestedAt: request.requestedAt,
+          respondedAt: request.respondedAt,
           userData: {
-            name: userDetail?.name || "Unknown",
-            email: user?.email || "Unknown",
+            name: userDetail?.name || "Unknown User",
+            email: user?.email || "Unknown Email",
             profilePicture: user?.profilePicture || null,
           },
         };
-      } catch (error) {
-        console.error("Error populating user details:", error);
-        return request;
-      }
-    })
-  );
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        populatedRequests,
-        "Team join requests fetched successfully"
-      )
+      })
     );
-});
+
+    return res.status(200).json({
+      success: true,
+      data: populatedRequests,
+      message: "Join requests retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching join requests:", error);
+    return next(errorHandler(500, "Failed to retrieve join requests"));
+  }
+};
 
 /**
  * Respond to a join request (accept/reject)
@@ -862,48 +985,83 @@ const respondToJoinRequest = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Get all teams with pending join requests for the current user
- * @route GET /api/v1/team/my-join-requests
- */
+// Get all join requests made by the current user
 const getUserJoinRequests = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
+  try {
+    const userId = req.user._id;
 
-  // Find teams where the user has pending join requests
-  const teams = await TeamDetail.find({
-    joinRequests: {
-      $elemMatch: {
-        userId: userId,
+    // Find teams where the user has join requests
+    const teams = await TeamDetail.find({
+      "joinRequests.userId": userId,
+    }).select("TeamName TeamLogo TeamDescription joinRequests");
+
+    // Format the response data
+    const userRequests = [];
+
+    teams.forEach((team) => {
+      const userJoinRequests = team.joinRequests.filter(
+        (request) => request.userId.toString() === userId.toString()
+      );
+
+      userJoinRequests.forEach((request) => {
+        userRequests.push({
+          teamId: team._id,
+          teamName: team.TeamName || "Unknown Team",
+          teamLogo: team.TeamLogo || null,
+          requestId: request._id,
+          status: request.status || "pending",
+          message: request.message || "",
+          requestedAt: request.requestedAt || new Date(),
+          respondedAt: request.respondedAt,
+        });
+      });
+    });
+
+    // Also fetch invitations sent to the user (where status is "invited")
+    const invitedTeams = await TeamDetail.find({
+      joinRequests: {
+        $elemMatch: {
+          userId: userId,
+          status: "invited",
+        },
       },
-    },
-  }).select("TeamName TeamLogo TeamDescription teamCreaterId joinRequests");
+    }).select("TeamName TeamLogo TeamDescription joinRequests");
 
-  // Extract and format the join requests for each team
-  const userRequests = teams.map((team) => {
-    const userRequest = team.joinRequests.find(
-      (req) => req.userId.toString() === userId.toString()
-    );
+    invitedTeams.forEach((team) => {
+      const invitations = team.joinRequests.filter(
+        (req) =>
+          req.userId.toString() === userId.toString() &&
+          req.status === "invited"
+      );
 
-    return {
-      teamId: team._id,
-      teamName: team.TeamName,
-      teamLogo: team.TeamLogo,
-      requestId: userRequest._id,
-      status: userRequest.status,
-      requestedAt: userRequest.requestedAt,
-      respondedAt: userRequest.respondedAt,
-    };
-  });
+      invitations.forEach((invitation) => {
+        userRequests.push({
+          teamId: team._id,
+          teamName: team.TeamName || "Unknown Team",
+          teamLogo: team.TeamLogo || null,
+          requestId: invitation._id,
+          status: "invited",
+          message: invitation.message || "",
+          requestedAt: invitation.requestedAt || new Date(),
+          respondedAt: invitation.respondedAt,
+          isInvitation: true,
+        });
+      });
+    });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        userRequests,
-        "User join requests fetched successfully"
-      )
-    );
+    // Always return success even if empty array
+    return res.status(200).json({
+      success: true,
+      data: userRequests,
+      message: "User join requests fetched successfully",
+    });
+  } catch (error) {
+    console.error("Error in getUserJoinRequests:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch join requests",
+    });
+  }
 });
 
 /**
@@ -932,12 +1090,101 @@ const cancelJoinRequest = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Join request cancelled successfully"));
 });
 
+/**
+ * Send invitation to join a team
+ * @route POST /api/v1/team/:teamId/invite
+ */
+const sendTeamInvitation = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const { userId, message = "" } = req.body;
+
+  if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
+    throw new ApiError(400, "Invalid team ID");
+  }
+
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+
+  // Find the team
+  const team = await TeamDetail.findById(teamId);
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
+
+  // Check if the requesting user is the team creator or has admin rights
+  if (team.TeamCreaterId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to send team invitations");
+  }
+
+  // Check if team is full
+  if (team.TeamMembers.length >= 5) {
+    throw new ApiError(400, "Team is already full (5 members maximum)");
+  }
+
+  // Check if the invited user already belongs to a team
+  const invitedUser = await User.findById(userId);
+  if (!invitedUser) {
+    throw new ApiError(404, "Invited user not found");
+  }
+
+  if (invitedUser.teamId) {
+    throw new ApiError(400, "User already belongs to a team");
+  }
+
+  // Check if user is already a member of this team
+  const isAlreadyMember = team.TeamMembers.some(
+    (member) => member.userId.toString() === userId
+  );
+
+  if (isAlreadyMember) {
+    throw new ApiError(409, "User is already a member of this team");
+  }
+
+  // Check if a request already exists
+  const existingRequest = team.joinRequests?.find(
+    (req) => req.userId.toString() === userId
+  );
+
+  if (existingRequest) {
+    throw new ApiError(409, "A join request already exists for this user");
+  }
+
+  // Add the invitation as a special type of join request
+  if (!team.joinRequests) {
+    team.joinRequests = [];
+  }
+
+  team.joinRequests.push({
+    userId,
+    message,
+    status: "invited", // Special status to indicate it was an invitation rather than a request
+    requestedAt: new Date(),
+    invitedBy: req.user._id,
+  });
+
+  await team.save();
+
+  // Could send notification/email to invited user here
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { requestId: team.joinRequests[team.joinRequests.length - 1]._id },
+        "Team invitation sent successfully"
+      )
+    );
+});
+
+// Make sure all these functions are defined in the file
 export {
   createTeam,
   getAllTeams,
   getTeamById,
   updateTeam,
-  addTeamMember,
+  addTeamMember, // Now properly included
   removeTeamMember,
   updateTechStack,
   addTeamMessage,
@@ -951,4 +1198,5 @@ export {
   respondToJoinRequest,
   getUserJoinRequests,
   cancelJoinRequest,
+  sendTeamInvitation,
 };

@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 
-const userSchema = new mongoose.Schema(
+// If updating existing schema, add teamId if not present
+const userSchema = mongoose.Schema(
   {
     email: {
       type: String,
@@ -26,6 +27,11 @@ const userSchema = new mongoose.Schema(
     refreshToken: {
       type: String,
     },
+    teamId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TeamDetail",
+      default: null,
+    },
 
     // Add 2FA fields if they don't already exist
     twoFactorEnabled: {
@@ -39,7 +45,9 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 userSchema.methods.generateAccessToken = function () {
@@ -70,4 +78,7 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
-export default mongoose.model("User", userSchema);
+// Create or update model
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+
+export default User;

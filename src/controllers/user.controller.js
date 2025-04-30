@@ -11,6 +11,7 @@ import uploadOnCloudinary from "../utils/fileUpload.js";
 import Interest from "../models/Interest.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
+import ApiError from "../utils/ApiError.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -150,6 +151,7 @@ export const createUserDetail = async (req, res, next) => {
     next(error);
   }
 };
+
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -166,9 +168,22 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({
         statusCode: 404,
         data: null,
-        message: "User Detail not found",
+        message: "User not found",
         success: false,
       });
+    }
+
+    // Check if UserDetail exists for this user
+    let userDetail = await UserDetail.findOne({ userId: userId });
+
+    // If no UserDetail exists, create a minimal one
+    if (!userDetail) {
+      console.log(`Creating new UserDetail for user ${userId}`);
+      userDetail = new UserDetail({
+        userId: userId,
+        name: user.name || req.body.name || "User",
+      });
+      await userDetail.save();
     }
 
     // Process the update
@@ -183,21 +198,51 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    user.name = req.body.name || user.name;
-    user.qId = req.body.qId || user.qId;
-    user.course = req.body.course || user.course;
-    user.session = req.body.session || user.session;
-    user.branch = req.body.branch || user.branch;
-    user.DOB = req.body.DOB || user.DOB;
-    user.profilePicture = profilePictureUrl || user.profilePicture;
-    user.interestId = req.body.interestId || user.interestId;
-    user.phoneNumber = req.body.phoneNumber || user.phoneNumber;
+    // Update User model fields
+    if (req.body.name) user.name = req.body.name;
+    if (req.body.email) user.email = req.body.email;
+    if (profilePictureUrl) user.profilePicture = profilePictureUrl;
+
+    // Handle teamId specifically (allow null)
+    if (req.body.teamId !== undefined) {
+      if (req.body.teamId === null) {
+        user.teamId = undefined; // Set to undefined to remove the field
+      } else {
+        user.teamId = req.body.teamId;
+      }
+    }
+
     await user.save();
+
+    // Update UserDetail fields if they exist
+    if (userDetail) {
+      if (req.body.name) userDetail.name = req.body.name;
+      if (req.body.qId) userDetail.qId = req.body.qId;
+      if (req.body.course) userDetail.course = req.body.course;
+      if (req.body.session) userDetail.session = req.body.session;
+      if (req.body.branch) userDetail.branch = req.body.branch;
+      if (req.body.DOB) userDetail.DOB = req.body.DOB;
+      if (profilePictureUrl) userDetail.profilePicture = profilePictureUrl;
+      if (req.body.interestId) userDetail.interestId = req.body.interestId;
+      if (req.body.phoneNumber) userDetail.phoneNumber = req.body.phoneNumber;
+      if (req.body.teamId !== undefined) {
+        if (req.body.teamId === null) {
+          userDetail.teamId = undefined; // Set to undefined to remove the field
+        } else {
+          userDetail.teamId = req.body.teamId;
+        }
+      }
+
+      await userDetail.save();
+    }
 
     // Return updated user
     return res.status(200).json({
       statusCode: 200,
-      data: user,
+      data: {
+        ...user.toObject(),
+        ...(userDetail ? userDetail.toObject() : {}),
+      },
       message: "User updated successfully",
       success: true,
     });
@@ -225,6 +270,7 @@ export const deleteUser = async (req, res, next) => {
     next(error);
   }
 };
+
 export const getUser = async (req, res, next) => {
   const { userId } = req.params;
   try {
@@ -344,7 +390,7 @@ export const searchUsers = async (req, res, next) => {
       .select("name qId profilePicture userId")
       .populate({
         path: "userId",
-        select: "email",
+        select: "email teamId",
       })
       .limit(10); // Limit to 10 results for performance
 
@@ -355,6 +401,7 @@ export const searchUsers = async (req, res, next) => {
       qId: user.qId,
       email: user.userId.email,
       profilePicture: user.profilePicture,
+      hasTeam: Boolean(user.userId.teamId),
     }));
 
     res
@@ -366,7 +413,7 @@ export const searchUsers = async (req, res, next) => {
 };
 
 // Get current user (me)
-export const getCurrentUser = asyncHandler(async (req, res) => {
+export const getCurrentUser = asyncHandler(async (req, res, next) => {
   try {
     // Ensure user ID exists in req.user
     if (!req.user || !req.user._id) {
@@ -374,6 +421,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     }
 
     const userId = req.user._id;
+    console.log("Fetching current user with ID:", userId);
 
     // Get user data
     const user = await User.findById(userId).select("-password");
@@ -381,7 +429,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       throw new ApiError(404, "User not found");
     }
 
-    // Get user details
+    // Get user details - don't fail if not found
     const userDetail = await UserDetail.findOne({ userId }).select("-__v");
 
     // Get individual data if it exists
@@ -391,6 +439,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     const userData = {
       ...user.toObject(),
       ...(userDetail ? userDetail.toObject() : {}),
+      name: user.name || (userDetail && userDetail.name) || "User", // Fixed syntax error here
       bio: individual?.description || "",
       individualId: individual?._id || null,
     };
@@ -400,6 +449,61 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, userData, "User data fetched successfully"));
   } catch (error) {
     console.error("Error in getCurrentUser:", error);
-    throw new ApiError(500, "Error fetching user data");
+    return next(error);
+  }
+});
+
+// Add new controller function for updating current user
+export const updateCurrentUser = asyncHandler(async (req, res, next) => {
+  try {
+    if (!req.user || !req.user._id) {
+      throw new ApiError(401, "Authentication required");
+    }
+
+    const userId = req.user._id;
+    console.log("Updating current user:", userId);
+    console.log("Update data:", req.body);
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Update user fields
+    if (req.body.name) user.name = req.body.name;
+    if (req.body.email) user.email = req.body.email;
+
+    // Handle team ID specifically
+    if (req.body.hasOwnProperty("teamId")) {
+      user.teamId = req.body.teamId || undefined;
+    }
+
+    await user.save();
+
+    // Update UserDetail if it exists
+    const userDetail = await UserDetail.findOne({ userId });
+    if (userDetail) {
+      if (req.body.name) userDetail.name = req.body.name;
+      if (req.body.hasOwnProperty("teamId")) {
+        userDetail.teamId = req.body.teamId || undefined;
+      }
+
+      await userDetail.save();
+    }
+
+    // Return the updated user
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          { ...user.toObject(), ...(userDetail ? userDetail.toObject() : {}) },
+          "User updated successfully"
+        )
+      );
+  } catch (error) {
+    console.error("Error updating current user:", error);
+    next(error);
   }
 });

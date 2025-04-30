@@ -9,13 +9,21 @@ import {
   getSecurityStatus,
 } from "../controllers/security.controller.js";
 
-const Router = express.Router();
+const router = express.Router();
 
-Router.get("/devices", verifyJWT, getDevices);
-Router.get("/logins", verifyJWT, getLoginHistory);
-Router.post("/device/trust", verifyJWT, trustDevice);
-Router.delete("/device/:deviceId", verifyJWT, removeDevice);
-Router.post("/logout-all", verifyJWT, logoutAllDevices);
-Router.get("/status", verifyJWT, getSecurityStatus);
+// All routes require authentication
+router.use(verifyJWT);
 
-export default Router;
+// Device management routes
+router.get("/devices", getDevices);
+router.post("/devices/trust", trustDevice);
+router.delete("/devices/:deviceId", removeDevice);
+router.post("/devices/logout-all", logoutAllDevices);
+
+// Login history
+router.get("/login-history", getLoginHistory);
+
+// Security status
+router.get("/status", getSecurityStatus);
+
+export default router;

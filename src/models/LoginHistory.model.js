@@ -5,7 +5,7 @@ const loginHistorySchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // Allow null for unsuccessful login attempts
     },
     deviceInfo: {
       type: String,
@@ -21,16 +21,16 @@ const loginHistorySchema = new mongoose.Schema(
     },
     ip: {
       type: String,
-      required: true,
+      default: "Unknown",
     },
     location: {
       type: String,
-      default: "Unknown",
+      default: "Unknown Location",
     },
     status: {
       type: String,
       enum: ["success", "failed"],
-      default: "success",
+      required: true,
     },
     reason: {
       type: String,
@@ -41,10 +41,9 @@ const loginHistorySchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { timestamps: true }
+  { timestamps: false }
 );
 
-// Index for faster queries
-loginHistorySchema.index({ userId: 1 });
+const LoginHistory = mongoose.model("LoginHistory", loginHistorySchema);
 
-export default mongoose.model("LoginHistory", loginHistorySchema);
+export default LoginHistory;

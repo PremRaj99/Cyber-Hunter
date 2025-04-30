@@ -33,9 +33,21 @@ export const isTeamCreator = asyncHandler(async (req, res, next) => {
 
 // Middleware to check if user is team member
 export const isTeamMember = asyncHandler(async (req, res, next) => {
-  const isMember = req.team.TeamMembers.some(
-    (member) => member.userId.toString() === req.user._id.toString()
-  );
+  // Safely access TeamMembers and protect against undefined
+  const teamMembers = req.team?.TeamMembers || [];
+
+  let isMember = false;
+  for (let i = 0; i < teamMembers.length; i++) {
+    const member = teamMembers[i];
+    if (
+      member &&
+      member.userId &&
+      member.userId.toString() === req.user._id.toString()
+    ) {
+      isMember = true;
+      break;
+    }
+  }
 
   if (!isMember) {
     throw new ApiError(403, "You are not a member of this team");
@@ -67,9 +79,21 @@ export const checkExistingJoinRequest = asyncHandler(async (req, res, next) => {
     throw new ApiError(404, "Team not found");
   }
 
-  const hasExistingRequest = team.joinRequests.some(
-    (request) => request.userId.toString() === userId.toString()
-  );
+  // Safely access joinRequests and protect against undefined
+  const joinRequests = team.joinRequests || [];
+
+  let hasExistingRequest = false;
+  for (let i = 0; i < joinRequests.length; i++) {
+    const request = joinRequests[i];
+    if (
+      request &&
+      request.userId &&
+      request.userId.toString() === userId.toString()
+    ) {
+      hasExistingRequest = true;
+      break;
+    }
+  }
 
   if (hasExistingRequest) {
     throw new ApiError(409, "You have already requested to join this team");
@@ -89,9 +113,21 @@ export const checkNotAlreadyMember = asyncHandler(async (req, res, next) => {
     throw new ApiError(404, "Team not found");
   }
 
-  const isAlreadyMember = team.TeamMembers.some(
-    (member) => member.userId.toString() === userId.toString()
-  );
+  // Safely access TeamMembers and protect against undefined
+  const teamMembers = team.TeamMembers || [];
+
+  let isAlreadyMember = false;
+  for (let i = 0; i < teamMembers.length; i++) {
+    const member = teamMembers[i];
+    if (
+      member &&
+      member.userId &&
+      member.userId.toString() === userId.toString()
+    ) {
+      isAlreadyMember = true;
+      break;
+    }
+  }
 
   if (isAlreadyMember) {
     throw new ApiError(409, "You are already a member of this team");

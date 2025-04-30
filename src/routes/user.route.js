@@ -7,7 +7,8 @@ import {
   getUsers,
   updateUser,
   searchUsers,
-  getCurrentUser, // Add the new controller function
+  getCurrentUser,
+  updateCurrentUser, // New controller function to add
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
@@ -17,6 +18,9 @@ const Router = express.Router();
 
 // Get current user (me) - Add this new route first
 Router.get("/me", verifyJWT, getCurrentUser);
+
+// NEW: Update current user route
+Router.post("/me/update", verifyJWT, updateCurrentUser);
 
 // Search users route
 Router.get("/search", verifyJWT, searchUsers);

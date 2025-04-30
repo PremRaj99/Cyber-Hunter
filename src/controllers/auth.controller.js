@@ -271,6 +271,8 @@ export const logout = async (req, res, next) => {
     // Remove current device
     const deviceId = req.cookies.deviceId || req.headers["x-device-id"];
     if (deviceId) {
+      // Import Device model that was missing
+      const Device = (await import("../models/Device.model.js")).default;
       await Device.findOneAndDelete({ deviceId, userId: req.user._id });
     }
 

@@ -13,41 +13,40 @@ const deviceSchema = new mongoose.Schema(
     },
     deviceName: {
       type: String,
-      required: true,
+      default: "Unknown Device",
     },
     browser: {
       type: String,
-      default: "Unknown",
+      default: "Unknown Browser",
     },
     os: {
       type: String,
-      default: "Unknown",
+      default: "Unknown OS",
     },
     ip: {
       type: String,
-      required: true,
+      default: "Unknown IP",
     },
     location: {
       type: String,
-      default: "Unknown",
-    },
-    lastActive: {
-      type: Date,
-      default: Date.now,
-    },
-    trusted: {
-      type: Boolean,
-      default: false,
+      default: "Unknown Location",
     },
     token: {
       type: String,
       required: true,
     },
+    trusted: {
+      type: Boolean,
+      default: false,
+    },
+    lastActive: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { timestamps: true }
 );
 
-// Index for faster queries
-deviceSchema.index({ userId: 1, deviceId: 1 });
+const Device = mongoose.model("Device", deviceSchema);
 
-export default mongoose.model("Device", deviceSchema);
+export default Device;

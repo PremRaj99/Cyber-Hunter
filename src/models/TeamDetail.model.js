@@ -1,6 +1,38 @@
 import mongoose from "mongoose";
 
-const TeamDetailSchema = new mongoose.Schema(
+const joinRequestSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    message: {
+      type: String,
+      default: "",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "rejected", "invited"],
+      default: "pending",
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    respondedAt: {
+      type: Date,
+    },
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  },
+  { _id: true }
+);
+
+// Update TeamDetail schema to include join requests if not already present
+const teamDetailSchema = mongoose.Schema(
   {
     TeamCreaterId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -104,10 +136,19 @@ const TeamDetailSchema = new mongoose.Schema(
         { name: "general", description: "General discussion", isActive: true },
       ],
     },
+    // Add joinRequests field if not already present
+    joinRequests: {
+      type: [joinRequestSchema],
+      default: [],
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-const TeamDetail = mongoose.model("TeamDetail", TeamDetailSchema);
+// Create or update model
+const TeamDetail =
+  mongoose.models.TeamDetail || mongoose.model("TeamDetail", teamDetailSchema);
 
 export default TeamDetail;
