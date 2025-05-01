@@ -69,7 +69,7 @@ export const login = async (req, res, next) => {
         "failed",
         "Invalid password"
       );
-      return next(errorHandler(401, "Invalid Password"));
+      return next(errorHandler(401, "Invalid Password, please try again with correct Details"));
     }
 
     // Record successful login
