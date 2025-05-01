@@ -3,27 +3,25 @@ import { verifyJWT } from "../middlewares/verifyUser.js";
 import {
   getDevices,
   getLoginHistory,
-  trustDevice,
-  removeDevice,
-  logoutAllDevices,
   getSecurityStatus,
+  logoutAllDevices,
+  removeDevice,
+  trustDevice,
 } from "../controllers/security.controller.js";
 
 const router = express.Router();
 
-// All routes require authentication
+// All security routes should be protected
 router.use(verifyJWT);
 
-// Device management routes
+// Device management
 router.get("/devices", getDevices);
-router.post("/devices/trust", trustDevice);
-router.delete("/devices/:deviceId", removeDevice);
-router.post("/devices/logout-all", logoutAllDevices);
+router.delete("/device/:deviceId", removeDevice);
+router.post("/device/trust", trustDevice);
+router.post("/logout-all", logoutAllDevices);
 
-// Login history
-router.get("/login-history", getLoginHistory);
-
-// Security status
+// Security information
+router.get("/logins", getLoginHistory);
 router.get("/status", getSecurityStatus);
 
 export default router;

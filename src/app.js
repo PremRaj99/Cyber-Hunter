@@ -9,7 +9,10 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import securityRouter from "./routes/security.route.js";
 import { trackDevice } from "./middlewares/deviceTracker.js";
-import "./models/Acheivement.model.js"; // <-- Ensure this import is present
+import "./models/Acheivement.model.js";
+import passport from "passport"; // Import passport here
+import session from "express-session"; // Import session here
+import setupPassport from "./config/passport.js"; // Import passport setup
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,16 +26,37 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// Configure CORS for production
-// app.use(
-  //   cors({
-//     origin: process.env.CORS_ORIGIN || "*",
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//     credentials: true,
-//   })
-// );
+// Configure proper CORS settings
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-device-id"],
+  })
+);
 
-app.use(cors());
+// Setup session before passport initialization
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "cyber-hunter-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Setup Passport strategies
+setupPassport();
 
 // import all router
 import authRoutes from "./routes/auth.route.js";
@@ -44,9 +68,17 @@ import languageRoutes from "./routes/language.rotue.js";
 import interestRoutes from "./routes/interest.route.js";
 import individualRoutes from "./routes/individual.route.js";
 import teamRouter from "./routes/team.routes.js";
+import githubAuthRoutes from "./routes/githubAuth.route.js"; // Import GitHub auth routes
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // define routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth", githubAuthRoutes); // Add GitHub auth routes
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/project", projectRoutes);
 app.use("/api/v1/tag", tagRoutes);
@@ -61,6 +93,18 @@ app.use(trackDevice);
 
 app.use("/api/v1/security", securityRouter);
 
+// Route to check GitHub configuration
+app.get("/api/v1/auth/github-status", (req, res) => {
+  const info = {
+    passportInitialized: !!passport._strategies.github,
+    clientId: process.env.GITHUB_CLIENT_ID ? "Configured" : "Missing",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET ? "Configured" : "Missing",
+    callbackUrl: process.env.GITHUB_CALLBACK_URL || "Not configured",
+  };
+
+  res.json(new ApiResponse(200, info, "GitHub OAuth configuration status"));
+});
+
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, "../../client/dist")));
 
@@ -70,12 +114,14 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
 });
 
+// Improved error handler
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "internal server error";
-  console.error(err.stack);
+  console.error("API Error:", err.stack);
 
-  res.status(statusCode).json(ApiResponse(statusCode, null, message));
+  // Send proper API response
+  res.status(statusCode).json(new ApiResponse(statusCode, null, message));
 });
 
 export default app;
