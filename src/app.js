@@ -69,6 +69,7 @@ import interestRoutes from "./routes/interest.route.js";
 import individualRoutes from "./routes/individual.route.js";
 import teamRouter from "./routes/team.routes.js";
 import githubAuthRoutes from "./routes/githubAuth.route.js"; // Import GitHub auth routes
+import walletAuthRoutes from "./routes/walletAuth.route.js"; // Import wallet auth routes
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -79,6 +80,7 @@ app.use((req, res, next) => {
 // define routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/auth", githubAuthRoutes); // Add GitHub auth routes
+app.use("/api/v1/wallet", walletAuthRoutes); // Add wallet auth routes
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/project", projectRoutes);
 app.use("/api/v1/tag", tagRoutes);

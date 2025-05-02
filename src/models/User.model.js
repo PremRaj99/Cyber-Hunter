@@ -33,6 +33,19 @@ const userSchema = mongoose.Schema(
       default: null,
     },
 
+    // Add wallet-related fields
+    walletAddress: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow multiple null values
+      lowercase: true,
+      trim: true,
+    },
+    walletConnected: {
+      type: Boolean,
+      default: false,
+    },
+
     // Add 2FA fields if they don't already exist
     twoFactorEnabled: {
       type: Boolean,
