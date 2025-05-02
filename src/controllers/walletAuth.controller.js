@@ -121,6 +121,24 @@ export const verifyWalletSignature = async (req, res, next) => {
       });
 
       await user.save();
+
+      // Create welcome notification for the new user
+      try {
+        const Notification = (await import("../models/Notification.model.js"))
+          .default;
+        await Notification.create({
+          userId: user._id,
+          title: "Welcome to Cyber Hunter! 🎉",
+          message:
+            "Thanks for connecting your wallet! We're excited to have you join our community.",
+          type: "success",
+          isRead: false,
+          link: "/dashboard/profile",
+        });
+      } catch (notifError) {
+        console.error("Failed to create welcome notification:", notifError);
+        // Continue execution even if notification creation fails
+      }
     } else {
       // Update existing user if needed
       if (!user.walletConnected) {

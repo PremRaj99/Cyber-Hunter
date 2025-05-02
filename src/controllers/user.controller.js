@@ -159,6 +159,7 @@ export const updateUser = async (req, res) => {
     // Debug logs
     console.log("Updating user with ID:", userId);
     console.log("Request body:", req.body);
+    console.log("Request files:", req.files);
 
     // Try to find the user first
     const user = await User.findById(userId);
@@ -183,32 +184,43 @@ export const updateUser = async (req, res) => {
         userId: userId,
         name: user.name || req.body.name || "User",
       });
-      await userDetail.save();
     }
 
-    // Process the update
-    const profilePictureLocalPath = req.files?.profilePicture?.[0]?.path;
-
+    // Process the profile picture upload if it exists
     let profilePictureUrl;
+    if (req.files && req.files.profilePicture && req.files.profilePicture[0]) {
+      const profilePictureLocalPath = req.files.profilePicture[0].path;
 
-    if (profilePictureLocalPath) {
-      const profilePicture = await uploadOnCloudinary(profilePictureLocalPath);
-      if (profilePicture) {
-        profilePictureUrl = profilePicture.url;
+      try {
+        const profilePicture = await uploadOnCloudinary(
+          profilePictureLocalPath
+        );
+        if (profilePicture) {
+          profilePictureUrl = profilePicture.url;
+          console.log(
+            "Profile picture uploaded to Cloudinary:",
+            profilePictureUrl
+          );
+        }
+      } catch (uploadError) {
+        console.error("Error uploading to Cloudinary:", uploadError);
       }
     }
 
-    // Update User model fields
+    // Update User model fields with safety checks
     if (req.body.name) user.name = req.body.name;
     if (req.body.email) user.email = req.body.email;
     if (profilePictureUrl) user.profilePicture = profilePictureUrl;
 
-    // Handle teamId specifically (allow null)
-    if (req.body.teamId !== undefined) {
-      if (req.body.teamId === null) {
-        user.teamId = undefined; // Set to undefined to remove the field
-      } else {
-        user.teamId = req.body.teamId;
+    // Handle bio field
+    if (req.body.bio) user.bio = req.body.bio;
+
+    // Handle social links - parse from JSON string if it exists
+    if (req.body.socialLinks) {
+      try {
+        user.socialLinks = JSON.parse(req.body.socialLinks);
+      } catch (e) {
+        console.error("Error parsing socialLinks:", e);
       }
     }
 
@@ -221,28 +233,29 @@ export const updateUser = async (req, res) => {
       if (req.body.course) userDetail.course = req.body.course;
       if (req.body.session) userDetail.session = req.body.session;
       if (req.body.branch) userDetail.branch = req.body.branch;
+      if (req.body.section) userDetail.section = req.body.section;
       if (req.body.DOB) userDetail.DOB = req.body.DOB;
       if (profilePictureUrl) userDetail.profilePicture = profilePictureUrl;
-      if (req.body.interestId) userDetail.interestId = req.body.interestId;
       if (req.body.phoneNumber) userDetail.phoneNumber = req.body.phoneNumber;
-      if (req.body.teamId !== undefined) {
-        if (req.body.teamId === null) {
-          userDetail.teamId = undefined; // Set to undefined to remove the field
-        } else {
-          userDetail.teamId = req.body.teamId;
-        }
-      }
+      if (req.body.gender) userDetail.gender = req.body.gender;
 
       await userDetail.save();
     }
 
-    // Return updated user
+    // Fetch updated user with related data for response
+    const updatedUserDetail = await UserDetail.findOne({ userId }).lean();
+    const individual = await Individual.findOne({ userId }).lean();
+
+    // Combine the data for response
+    const responseData = {
+      ...user.toObject(),
+      ...(updatedUserDetail || {}),
+      bio: individual?.description || user.bio || "",
+    };
+
     return res.status(200).json({
       statusCode: 200,
-      data: {
-        ...user.toObject(),
-        ...(userDetail ? userDetail.toObject() : {}),
-      },
+      data: responseData,
       message: "User updated successfully",
       success: true,
     });

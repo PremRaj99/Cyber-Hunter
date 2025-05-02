@@ -69,7 +69,12 @@ export const login = async (req, res, next) => {
         "failed",
         "Invalid password"
       );
-      return next(errorHandler(401, "Invalid Password, please try again with correct Details"));
+      return next(
+        errorHandler(
+          401,
+          "Invalid Password, please try again with correct Details"
+        )
+      );
     }
 
     // Record successful login
@@ -167,6 +172,24 @@ export const signup = async (req, res, next) => {
 
     const user = new User({ email, password: hashedPassword });
     await user.save();
+
+    // Create welcome notification for the new user
+    try {
+      const Notification = (await import("../models/Notification.model.js"))
+        .default;
+      await Notification.create({
+        userId: user._id,
+        title: "Welcome to Cyber Hunter! 🎉",
+        message:
+          "Congratulations on joining our community! We're excited to have you onboard.",
+        type: "success",
+        isRead: false,
+        link: "/dashboard/profile",
+      });
+    } catch (notifError) {
+      console.error("Failed to create welcome notification:", notifError);
+      // Continue execution even if notification creation fails
+    }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id

@@ -86,6 +86,28 @@ const setupPassport = () => {
                     displayName: profile.displayName || profile.username,
                     emailVerified: true,
                   });
+
+                  // Create welcome notification for the new GitHub user
+                  try {
+                    const Notification = (
+                      await import("../models/Notification.model.js")
+                    ).default;
+                    await Notification.create({
+                      userId: user._id,
+                      title: "Welcome to Cyber Hunter! 🎉",
+                      message:
+                        "Thanks for joining with GitHub! We're excited to have you in our community.",
+                      type: "success",
+                      isRead: false,
+                      link: "/dashboard/profile",
+                    });
+                  } catch (notifError) {
+                    console.error(
+                      "Failed to create welcome notification:",
+                      notifError
+                    );
+                    // Continue without failing if notification can't be created
+                  }
                 }
               } else {
                 // Create user with placeholder email if no email provided
@@ -100,6 +122,27 @@ const setupPassport = () => {
                   password: randomPassword,
                   emailVerified: true,
                 });
+
+                // Create welcome notification for the new GitHub user with placeholder email
+                try {
+                  const Notification = (
+                    await import("../models/Notification.model.js")
+                  ).default;
+                  await Notification.create({
+                    userId: user._id,
+                    title: "Welcome to Cyber Hunter! 🎉",
+                    message:
+                      "Thanks for joining with GitHub! We're excited to have you in our community.",
+                    type: "success",
+                    isRead: false,
+                    link: "/dashboard/profile",
+                  });
+                } catch (notifError) {
+                  console.error(
+                    "Failed to create welcome notification for GitHub user:",
+                    notifError
+                  );
+                }
               }
             } else {
               // Update existing user with latest GitHub info
