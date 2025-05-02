@@ -71,6 +71,7 @@ import teamRouter from "./routes/team.routes.js";
 import githubAuthRoutes from "./routes/githubAuth.route.js";
 import walletAuthRoutes from "./routes/walletAuth.route.js";
 import notificationRouter from "./routes/notification.route.js"; // Add notification routes
+import newsletterRoutes from "./routes/newsletter.route.js"; // Add newsletter routes
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -91,6 +92,7 @@ app.use("/api/v1/interest", interestRoutes);
 app.use("/api/v1/individual", individualRoutes);
 app.use("/api/v1/team", teamRouter);
 app.use("/api/v1/notifications", notificationRouter); // Add notification routes
+app.use("/api/v1/newsletter", newsletterRoutes); // Add newsletter routes
 
 // Apply device tracking after authentication middleware
 app.use(trackDevice);
