@@ -324,7 +324,7 @@ export const logout = async (req, res, next) => {
 };
 
 export const refreshToken = async (req, res, next) => {
-  const { refreshToken } = req.cookies;
+  const { refreshToken } = req.cookies || req.body;
   if (!refreshToken) {
     return next(errorHandler(401, "Unauthorized"));
   }
@@ -340,7 +340,13 @@ export const refreshToken = async (req, res, next) => {
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", newRefreshToken, options)
       .status(200)
-      .json(ApiResponse(200, { accessToken }, "Refresh Token Generated"));
+      .json(
+        ApiResponse(
+          200,
+          { accessToken, refreshToken: newRefreshToken },
+          "Refresh Token Generated"
+        )
+      );
   } catch (error) {
     next(error);
   }
