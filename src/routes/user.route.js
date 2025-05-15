@@ -11,6 +11,7 @@ import {
   updateCurrentUser, // New controller function to add
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import * as notificationSettingsController from "../controllers/notificationSettings.controller.js";
 
 const Router = express.Router();
 
@@ -59,5 +60,30 @@ Router.get("/", getUsers);
 
 // get user detail
 Router.get("/:userId", getUser);
+
+// Notification settings routes
+Router.get(
+  "/notification-settings",
+  verifyJWT,
+  notificationSettingsController.getUserNotificationSettings
+);
+
+Router.patch(
+  "/notification-settings",
+  verifyJWT,
+  notificationSettingsController.updateNotificationSettings
+);
+
+Router.post(
+  "/notification-settings/mute-all",
+  verifyJWT,
+  notificationSettingsController.muteAllNotifications
+);
+
+Router.post(
+  "/notification-settings/do-not-disturb",
+  verifyJWT,
+  notificationSettingsController.enableDoNotDisturb
+);
 
 export default Router;

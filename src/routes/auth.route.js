@@ -9,7 +9,8 @@ import {
   test,
   verifyEmail,
   changePassword,
-  verifyPassword, // Add this import
+  verifyPassword,
+  verifyTwoFactorAndLogin, // Add this import
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middlewares/verifyUser.js";
 import {
@@ -29,6 +30,7 @@ Router.get("/test", test);
 
 // login
 Router.post("/login", login);
+Router.post("/login/verify-2fa", verifyTwoFactorAndLogin); // Add new endpoint for 2FA verification during login
 
 // verify Email
 Router.post("/send-otp", verifyJWT, sendEmailRequest);
@@ -46,7 +48,7 @@ Router.post("/logout", verifyJWT, logout);
 Router.put("/refresh", verifyJWT, refreshToken);
 
 // Password management
-Router.post("/verify-password", verifyJWT, verifyPassword); // Add this route
+Router.post("/verify-password", verifyJWT, verifyPassword);
 Router.post("/change-password", verifyJWT, changePassword);
 
 // 2FA endpoints
@@ -54,8 +56,6 @@ Router.get("/2fa/status", verifyJWT, get2FAStatus);
 Router.post("/2fa/generate", verifyJWT, generate2FASecret);
 Router.post("/2fa/verify", verifyJWT, verify2FAToken);
 Router.post("/2fa/disable", verifyJWT, disable2FA);
-
-// Make validate2FALogin public - no JWT verification required
 Router.post("/2fa/validate", validate2FALogin);
 
 export default Router;

@@ -44,6 +44,19 @@ export const generate2FASecret = async (req, res, next) => {
 export const verify2FAToken = async (req, res, next) => {
   try {
     const { token } = req.body;
+
+    // Add validation for token format
+    if (
+      !token ||
+      typeof token !== "string" ||
+      token.length !== 6 ||
+      !/^\d+$/.test(token)
+    ) {
+      return next(
+        errorHandler(400, "Invalid token format. Must be a 6-digit number")
+      );
+    }
+
     const userId = req.user._id;
     const user = await User.findById(userId);
 
@@ -56,12 +69,19 @@ export const verify2FAToken = async (req, res, next) => {
       return next(errorHandler(400, "2FA setup not initiated"));
     }
 
-    // Verify the token
+    console.log(
+      `Verifying token: ${token} with secret: ${user.twoFactorTempSecret}`
+    );
+
+    // Verify the token with window parameter to handle timing issues
     const verified = speakeasy.totp.verify({
       secret: user.twoFactorTempSecret,
       encoding: "base32",
       token: token,
+      window: 2, // Allow a time skew of +/- 2 steps (60 seconds)
     });
+
+    console.log(`Token verification result: ${verified}`);
 
     if (!verified) {
       return next(errorHandler(400, "Invalid 2FA token"));
@@ -83,6 +103,7 @@ export const verify2FAToken = async (req, res, next) => {
         )
       );
   } catch (error) {
+    console.error("2FA verification error:", error);
     next(error);
   }
 };

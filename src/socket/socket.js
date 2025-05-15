@@ -8,34 +8,59 @@ const connectedUsers = new Map();
  * @param {Server} io - Socket.IO server instance
  */
 export const initializeSocketIO = (io) => {
-  // Authentication middleware
+  // Add authentication middleware
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth.token;
+
       if (!token) {
         return next(new Error("Authentication error: Token required"));
       }
 
-      // Verify JWT token
-      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-      socket.userId = decoded._id;
-      next();
+      // Verify the token
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return next(new Error("Authentication error: Invalid token"));
+        }
+
+        // Store user information on the socket
+        socket.user = decoded;
+        next();
+      });
     } catch (error) {
       console.error("Socket authentication error:", error);
-      next(new Error("Authentication error: Invalid token"));
+      next(
+        new Error("Authentication error: " + (error.message || "Unknown error"))
+      );
     }
   });
 
-  io.on("connection", (socket) => {
-    console.log(`New socket connection: ${socket.id}`);
+  console.log("Socket.IO service initialized");
 
-    // Register user for receiving notifications
+  io.on("connection", (socket) => {
+    console.log(
+      `New socket connected: ${socket.id}, User: ${socket.user?._id || "Unknown"}`
+    );
+
     socket.on("register", (userId) => {
-      if (userId) {
+      // Verify the userId matches the authenticated user
+      if (socket.user && socket.user._id === userId) {
         // Store the mapping between userId and socketId
         connectedUsers.set(userId, socket.id);
+        socket.userId = userId; // Store on socket for easy lookup on disconnect
         console.log(`User registered: ${userId} -> ${socket.id}`);
         console.log(`Online users: ${connectedUsers.size}`);
+
+        // Acknowledge the registration
+        socket.emit("registered", { success: true });
+      } else {
+        console.log(
+          `Registration failed: User ID mismatch or unauthorized for socket ${socket.id}`
+        );
+        socket.emit("registered", {
+          success: false,
+          error: "Unauthorized registration attempt",
+        });
       }
     });
 
@@ -46,11 +71,16 @@ export const initializeSocketIO = (io) => {
         connectedUsers.delete(socket.userId);
         console.log(`User disconnected: ${socket.userId}`);
         console.log(`Online users: ${connectedUsers.size}`);
+      } else {
+        console.log(`Socket disconnected without registration: ${socket.id}`);
       }
     });
-  });
 
-  console.log("Socket.IO initialized");
+    // Handle errors
+    socket.on("error", (err) => {
+      console.error(`Socket error for ${socket.id}:`, err);
+    });
+  });
 };
 
 /**

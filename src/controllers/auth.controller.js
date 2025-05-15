@@ -10,6 +10,7 @@ import EmailVerification from "../models/EmailVerification.model.js";
 import Individual from "../models/Individual.model.js";
 import { googleUserResponse, oauth2Client } from "../utils/googleClient.js";
 import { recordLoginAttempt, registerDevice } from "./security.controller.js";
+import speakeasy from "speakeasy";
 
 export const test = (req, res) => {
   res.json({
@@ -83,6 +84,30 @@ export const login = async (req, res, next) => {
     // Register device
     const deviceData = await registerDevice(validEmail._id, req);
 
+    // Check if 2FA is enabled for the user
+    if (validEmail.twoFactorEnabled && validEmail.twoFactorSecret) {
+      // Return a different response that indicates 2FA is required
+      return res.status(200).json(
+        ApiResponse(
+          200,
+          {
+            requiresTwoFactor: true,
+            email: validEmail.email,
+            userId: validEmail._id,
+            // Include userData but not access tokens
+            userData: {
+              ...validEmail._doc,
+              password: undefined,
+              twoFactorSecret: undefined,
+              twoFactorTempSecret: undefined,
+            },
+          },
+          "Please enter 2FA code to complete login"
+        )
+      );
+    }
+
+    // If 2FA is not enabled, proceed with normal login flow
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       validEmail._id
     );
@@ -96,47 +121,8 @@ export const login = async (req, res, next) => {
       userId: validEmail._id,
     }).select("-_id -userId");
 
-    if (!userDetail) {
-      return res
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
-        .cookie("deviceId", deviceData.deviceId, {
-          ...options,
-          maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
-        })
-        .cookie("deviceToken", deviceData.token, {
-          ...options,
-          maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
-        })
-        .status(200)
-        .json(
-          ApiResponse(
-            200,
-            { ...rest, accessToken, refreshToken },
-            "Login Successful"
-          )
-        );
-    }
-
-    const data = {
-      ...rest,
-      accessToken,
-      refreshToken,
-      name: userDetail.name,
-      course: userDetail.course,
-      session: userDetail.session,
-      branch: userDetail.branch,
-      profilePicture: userDetail.profilePicture,
-      DOB: userDetail.DOB,
-      phoneNumber: userDetail.phoneNumber,
-      gender: userDetail.gender,
-      teamId: userDetail.teamId,
-      qId: userDetail.qId,
-      interest: userDetail.interestId.map((int) => int.content),
-      bio: individual?.description,
-    };
-
-    res
+    // Return the user data with tokens
+    return res
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .cookie("deviceId", deviceData.deviceId, {
@@ -145,12 +131,87 @@ export const login = async (req, res, next) => {
       })
       .cookie("deviceToken", deviceData.token, {
         ...options,
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+        maxAge: 365 * 24 * 60 * 60 * 1000,
       })
       .status(200)
-      .json(ApiResponse(200, data, "Login Successful"));
+      .json(
+        ApiResponse(
+          200,
+          { ...rest, accessToken, refreshToken },
+          "Login Successful"
+        )
+      );
   } catch (error) {
     next(error);
+  }
+};
+
+export const verifyTwoFactorAndLogin = async (req, res, next) => {
+  try {
+    const { email, token } = req.body;
+
+    if (!email || !token) {
+      return next(errorHandler(400, "Email and 2FA token are required"));
+    }
+
+    // Find the user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(errorHandler(404, "User not found"));
+    }
+
+    // Check if 2FA is enabled
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      return next(errorHandler(400, "2FA is not enabled for this account"));
+    }
+
+    // Verify the 2FA token
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: "base32",
+      token,
+      window: 2, // Allow a time skew of +/- 2 steps (60 seconds)
+    });
+
+    if (!verified) {
+      return next(errorHandler(401, "Invalid 2FA code"));
+    }
+
+    // Register device
+    const deviceData = await registerDevice(user._id, req);
+
+    // Generate tokens
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+
+    // Get user data without sensitive info
+    const { password, twoFactorSecret, twoFactorTempSecret, ...userData } =
+      user._doc;
+
+    // Return success with tokens
+    return res
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .cookie("deviceId", deviceData.deviceId, {
+        ...options,
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      })
+      .cookie("deviceToken", deviceData.token, {
+        ...options,
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      })
+      .status(200)
+      .json(
+        ApiResponse(
+          200,
+          { ...userData, accessToken, refreshToken },
+          "2FA verified and login successful"
+        )
+      );
+  } catch (error) {
+    console.error("Error verifying 2FA:", error);
+    next(errorHandler(500, "Error during 2FA verification"));
   }
 };
 

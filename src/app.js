@@ -26,15 +26,30 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// Configure proper CORS settings
+// CORS configuration
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-device-id"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Add a special handler for OPTIONS preflight requests
+app.options("*", (req, res) => {
+  res.header(
+    "Access-Control-Allow-Origin",
+    process.env.CORS_ORIGIN || "http://localhost:5173"
+  );
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PATCH, PUT, DELETE, OPTIONS"
+  );
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.status(204).send();
+});
 
 // Setup session before passport initialization
 app.use(
@@ -72,6 +87,8 @@ import githubAuthRoutes from "./routes/githubAuth.route.js";
 import walletAuthRoutes from "./routes/walletAuth.route.js";
 import notificationRouter from "./routes/notification.route.js"; // Add notification routes
 import newsletterRoutes from "./routes/newsletter.route.js"; // Add newsletter routes
+import supportRouter from "./routes/support.route.js"; // Import support routes
+import notificationRoutes from "./routes/notification.route.js"; // Add this to your existing route imports
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -91,9 +108,10 @@ app.use("/api/v1/language", languageRoutes);
 app.use("/api/v1/interest", interestRoutes);
 app.use("/api/v1/individual", individualRoutes);
 app.use("/api/v1/team", teamRouter);
-app.use("/api/v1/notifications", notificationRouter); // Add notification routes
-app.use("/api/v1/newsletter", newsletterRoutes); // Add newsletter routes
-
+app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/newsletter", newsletterRoutes);
+app.use("/api/v1/support", supportRouter);
+app.use("/api/v1/notifications", notificationRoutes); // Add this to your route setup section
 // Apply device tracking after authentication middleware
 app.use(trackDevice);
 
