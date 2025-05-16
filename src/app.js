@@ -89,6 +89,8 @@ import notificationRouter from "./routes/notification.route.js"; // Add notifica
 import newsletterRoutes from "./routes/newsletter.route.js"; // Add newsletter routes
 import supportRouter from "./routes/support.route.js"; // Import support routes
 import notificationRoutes from "./routes/notification.route.js"; // Add this to your existing route imports
+import leaderboardRoutes from "./routes/leaderboard.route.js"; // Add leaderboard routes
+import contactRoutes from "./routes/contact.route.js"; // Import contact routes
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -111,7 +113,10 @@ app.use("/api/v1/team", teamRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/newsletter", newsletterRoutes);
 app.use("/api/v1/support", supportRouter);
-app.use("/api/v1/notifications", notificationRoutes); // Add this to your route setup section
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/leaderboard", leaderboardRoutes);
+app.use("/api/v1/contact", contactRoutes);
+
 // Apply device tracking after authentication middleware
 app.use(trackDevice);
 

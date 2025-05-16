@@ -7,6 +7,7 @@ import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
 import { errorHandler } from "../utils/error.js";
+import { updateTeamLeaderboard } from "../utils/leaderboardHelper.js";
 
 // Create a new team
 const createTeam = asyncHandler(async (req, res) => {
@@ -1178,13 +1179,55 @@ const sendTeamInvitation = asyncHandler(async (req, res) => {
     );
 });
 
+// Update team points
+const updateTeamPoints = asyncHandler(async (req, res) => {
+  const { teamId } = req.params;
+  const { points } = req.body;
+
+  if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
+    throw new ApiError(400, "Invalid team ID");
+  }
+
+  if (isNaN(points)) {
+    throw new ApiError(400, "Points must be a number");
+  }
+
+  const team = await TeamDetail.findById(teamId);
+
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
+
+  // Only team creator can update points (or you can modify this permission)
+  if (team.TeamCreaterId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to update team points");
+  }
+
+  // Update team points
+  team.points = points;
+  await team.save();
+
+  // Update leaderboard
+  await updateTeamLeaderboard(teamId, points);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { teamId, points },
+        "Team points updated successfully"
+      )
+    );
+});
+
 // Make sure all these functions are defined in the file
 export {
   createTeam,
   getAllTeams,
   getTeamById,
   updateTeam,
-  addTeamMember, // Now properly included
+  addTeamMember,
   removeTeamMember,
   updateTechStack,
   addTeamMessage,
@@ -1199,4 +1242,5 @@ export {
   getUserJoinRequests,
   cancelJoinRequest,
   sendTeamInvitation,
+  updateTeamPoints,
 };
