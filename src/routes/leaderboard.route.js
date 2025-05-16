@@ -4,6 +4,7 @@ import {
   getLeaderboard,
   updateLeaderboardRankings,
   getLeaderboardFilters,
+  initializeLeaderboard,
 } from "../controllers/leaderboard.controller.js";
 
 const router = express.Router();
@@ -16,5 +17,8 @@ router.get("/filters", getLeaderboardFilters);
 
 // Update leaderboard rankings (admin only)
 router.post("/update-rankings", verifyJWT, updateLeaderboardRankings);
+
+// Initialize leaderboard with existing data (admin only)
+router.post("/initialize", verifyJWT, initializeLeaderboard);
 
 export default router;

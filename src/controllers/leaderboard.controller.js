@@ -9,6 +9,7 @@ import Tag from "../models/Tag.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
+import { initializeLeaderboardData } from "../utils/leaderboardHelper.js";
 
 /**
  * Get leaderboard data with filtering options
@@ -67,93 +68,258 @@ export const getLeaderboard = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Get paginated results with search
+    // Get paginated results (we'll handle search differently below)
     const leaderboardItems = await Leaderboard.find(query)
       .sort({ points: -1, lastUpdated: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
-    // Get total count
-    const totalCount = await Leaderboard.countDocuments(query);
+    // If no items found, return empty results
+    if (!leaderboardItems || leaderboardItems.length === 0) {
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            results: [],
+            topThree: [],
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              totalCount: 0,
+              totalPages: 0,
+            },
+          },
+          `${type.charAt(0).toUpperCase() + type.slice(1)} leaderboard fetched successfully`
+        )
+      );
+    }
 
     // Populate additional information based on type
     let populatedResults = [];
+    let totalCount = 0;
 
     if (type === "individual") {
-      // Get ids to fetch in bulk
-      const userIds = leaderboardItems.map((item) => item.userId);
+      // Get ids to fetch in bulk - filter out any null or undefined IDs
+      const userIds = leaderboardItems
+        .map((item) => item.userId)
+        .filter((id) => id != null);
 
-      // Fetch user and user details in parallel
-      const [users, userDetails] = await Promise.all([
+      if (userIds.length === 0) {
+        return res.status(200).json(
+          new ApiResponse(
+            200,
+            {
+              results: [],
+              topThree: [],
+              pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalCount: 0,
+                totalPages: 0,
+              },
+            },
+            "No valid user IDs found in leaderboard"
+          )
+        );
+      }
+
+      // Fetch complete user information with all relevant relationships
+      const [users, userDetails, projects] = await Promise.all([
         User.find({ _id: { $in: userIds } })
-          .select("email profilePicture")
+          .select("email") // Remove profilePicture from User model selection
           .lean(),
         UserDetail.find({ userId: { $in: userIds } })
-          .select("name")
+          .select("name userId profilePicture") // Add profilePicture to UserDetail selection
           .lean(),
+        mongoose.connection.db
+          .collection("projects")
+          .find({
+            userId: {
+              $in: userIds
+                .map((id) => {
+                  try {
+                    return new mongoose.Types.ObjectId(id.toString());
+                  } catch (err) {
+                    console.warn(`Invalid ObjectId: ${id}`, err);
+                    return null;
+                  }
+                })
+                .filter(Boolean),
+            },
+          })
+          .toArray(),
       ]);
 
-      // Create lookup maps for efficient access
-      const userMap = users.reduce((map, user) => {
-        map[user._id.toString()] = user;
-        return map;
-      }, {});
-
-      const userDetailMap = userDetails.reduce((map, detail) => {
-        map[detail.userId.toString()] = detail;
-        return map;
-      }, {});
-
-      // Enhance leaderboard items with user information
-      populatedResults = leaderboardItems.map((item, index) => {
-        const userId = item.userId.toString();
-        const user = userMap[userId] || {};
-        const userDetail = userDetailMap[userId] || {};
-
-        return {
-          rank: item.rank || index + 1 + skip,
-          name: userDetail.name || user.email?.split("@")[0] || "Unknown User",
-          points: item.points,
-          userId: item.userId,
-          profilePicture: user.profilePicture,
-          techStack: item.techStacks ? "Multiple" : "Not specified",
-          language: item.languages ? "Multiple" : "Not specified",
-        };
+      // Create lookup maps for efficient access - safely handle undefined values
+      const userMap = {};
+      users.forEach((user) => {
+        if (user && user._id) {
+          userMap[user._id.toString()] = user;
+        }
       });
 
-      // Apply search filter if needed
+      const userDetailMap = {};
+      userDetails.forEach((detail) => {
+        if (detail && detail.userId) {
+          userDetailMap[detail.userId.toString()] = detail;
+        }
+      });
+
+      // Group projects by user ID
+      const projectMap = {};
+      projects.forEach((project) => {
+        if (project && project.userId) {
+          const userId = project.userId.toString();
+          if (!projectMap[userId]) {
+            projectMap[userId] = [];
+          }
+          projectMap[userId].push(project);
+        }
+      });
+
+      // Enhance leaderboard items with user information - safely
+      populatedResults = leaderboardItems
+        .map((item, index) => {
+          // Skip items with invalid userId
+          if (!item.userId) {
+            return null;
+          }
+
+          const userId = item.userId.toString();
+          const user = userMap[userId] || {};
+          const userDetail = userDetailMap[userId] || {};
+          const userProjects = projectMap[userId] || [];
+
+          // Extract unique tech stacks and languages from user's projects
+          const techStacks = new Set();
+          const languages = new Set();
+
+          userProjects.forEach((project) => {
+            if (project.techStack && Array.isArray(project.techStack)) {
+              project.techStack.forEach((tech) => techStacks.add(tech));
+            }
+            if (
+              project.programmingLanguages &&
+              Array.isArray(project.programmingLanguages)
+            ) {
+              project.programmingLanguages.forEach((lang) =>
+                languages.add(lang)
+              );
+            }
+          });
+
+          const techStackList = Array.from(techStacks);
+          const languageList = Array.from(languages);
+
+          // Use profilePicture from UserDetail model instead of User model
+          return {
+            rank: item.rank || index + 1 + skip,
+            name:
+              userDetail.name || user.email?.split("@")[0] || "Unknown User",
+            email: user.email || "No Email",
+            points: item.points || 0,
+            userId: item.userId,
+            profilePicture: userDetail.profilePicture || null, // Get profilePicture from userDetail instead
+            techStack:
+              techStackList.length > 0
+                ? techStackList.length === 1
+                  ? techStackList[0]
+                  : `${techStackList[0]} +${techStackList.length - 1}`
+                : "Not specified",
+            language:
+              languageList.length > 0
+                ? languageList.length === 1
+                  ? languageList[0]
+                  : `${languageList[0]} +${languageList.length - 1}`
+                : "Not specified",
+          };
+        })
+        .filter(Boolean); // Remove any null entries
+
+      // Sort the results by rank ascending (lowest rank number first)
+      populatedResults.sort((a, b) => (a.rank || 999) - (b.rank || 999));
+
+      // Apply search filter now to both name and email
       if (search) {
-        populatedResults = populatedResults.filter((item) =>
-          item.name.toLowerCase().includes(search.toLowerCase())
+        populatedResults = populatedResults.filter(
+          (item) =>
+            (item.name &&
+              item.name.toLowerCase().includes(search.toLowerCase())) ||
+            (item.email &&
+              item.email.toLowerCase().includes(search.toLowerCase()))
         );
       }
+
+      // Get the filtered total count
+      totalCount = populatedResults.length;
+
+      // Apply pagination after filtering
+      populatedResults = populatedResults.slice(0, parseInt(limit));
     } else {
-      // For teams
-      const teamIds = leaderboardItems.map((item) => item.teamId);
-      const teams = await TeamDetail.find({ _id: { $in: teamIds } })
-        .select("TeamName TeamLogo TeamMembers")
-        .lean();
+      // For teams - the existing code with safety checks
+      const teamIds = leaderboardItems
+        .map((item) => item.teamId)
+        .filter((id) => id != null);
 
-      const teamMap = teams.reduce((map, team) => {
-        map[team._id.toString()] = team;
-        return map;
-      }, {});
+      if (teamIds.length === 0) {
+        return res.status(200).json(
+          new ApiResponse(
+            200,
+            {
+              results: [],
+              topThree: [],
+              pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalCount: 0,
+                totalPages: 0,
+              },
+            },
+            "No valid team IDs found in leaderboard"
+          )
+        );
+      }
 
-      populatedResults = leaderboardItems.map((item, index) => {
-        const teamId = item.teamId.toString();
-        const team = teamMap[teamId] || {};
+      let teams = [];
 
-        return {
-          rank: item.rank || index + 1 + skip,
-          name: team.TeamName || "Unknown Team",
-          points: item.points,
-          teamId: item.teamId,
-          teamLogo: team.TeamLogo,
-          members: team.TeamMembers?.length || 0,
-          techStack: item.techStacks ? "Multiple" : "Not specified",
-        };
+      try {
+        teams = await TeamDetail.find({ _id: { $in: teamIds } })
+          .select("TeamName TeamLogo TeamMembers")
+          .lean();
+      } catch (error) {
+        console.error("Error fetching teams:", error);
+        // Continue with empty array if query fails
+      }
+
+      const teamMap = {};
+      teams.forEach((team) => {
+        if (team && team._id) {
+          teamMap[team._id.toString()] = team;
+        }
       });
+
+      populatedResults = leaderboardItems
+        .map((item, index) => {
+          if (!item || !item.teamId) {
+            // Skip invalid items
+            return null;
+          }
+
+          const teamId = item.teamId.toString();
+          const team = teamMap[teamId] || {};
+
+          return {
+            rank: item.rank || index + 1 + skip,
+            name: team.TeamName || "Unknown Team",
+            points: item.points || 0,
+            teamId: item.teamId,
+            teamLogo: team.TeamLogo || null,
+            members: team.TeamMembers?.length || 0,
+            techStack: item.techStacks ? "Multiple" : "Not specified",
+          };
+        })
+        .filter(Boolean); // Remove null entries
 
       // Apply search filter if needed
       if (search) {
@@ -161,15 +327,17 @@ export const getLeaderboard = asyncHandler(async (req, res) => {
           item.name.toLowerCase().includes(search.toLowerCase())
         );
       }
+
+      totalCount = populatedResults.length;
     }
 
     // For the top 3 results, we'll get them separately to display on podium
     let topThree = [];
     if (parseInt(page) === 1 && populatedResults.length > 0) {
-      topThree = populatedResults.slice(
-        0,
-        Math.min(3, populatedResults.length)
-      );
+      // Get the first 3 elements after sorting by rank
+      topThree = [...populatedResults]
+        .sort((a, b) => (a.rank || 999) - (b.rank || 999))
+        .slice(0, 3);
     }
 
     return res.status(200).json(
@@ -193,6 +361,7 @@ export const getLeaderboard = asyncHandler(async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch leaderboard data",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -201,82 +370,91 @@ export const getLeaderboard = asyncHandler(async (req, res) => {
  * Update leaderboard rankings
  * This function should be called periodically or when points are updated
  */
-export const updateLeaderboardRankings = asyncHandler(async (req, res) => {
-  try {
-    // Update individual rankings
-    const individuals = await Individual.find()
-      .select("userId point")
-      .sort({ point: -1 })
-      .lean();
+export const updateLeaderboardRankings = asyncHandler(
+  async (req, res, silent = false) => {
+    try {
+      // Update individual rankings
+      const individuals = await Individual.find()
+        .select("userId point")
+        .sort({ point: -1 })
+        .lean();
 
-    // Process each individual
-    for (let i = 0; i < individuals.length; i++) {
-      const individual = individuals[i];
+      // Process each individual
+      for (let i = 0; i < individuals.length; i++) {
+        const individual = individuals[i];
 
-      // Find or create leaderboard entry
-      await Leaderboard.findOneAndUpdate(
-        {
-          type: "individual",
-          userId: individual.userId,
-        },
-        {
-          points: individual.point,
-          rank: i + 1,
-          lastUpdated: new Date(),
-        },
-        {
-          upsert: true,
-          new: true,
-        }
+        // Find or create leaderboard entry
+        await Leaderboard.findOneAndUpdate(
+          {
+            type: "individual",
+            userId: individual.userId,
+          },
+          {
+            points: individual.point,
+            rank: i + 1,
+            lastUpdated: new Date(),
+          },
+          {
+            upsert: true,
+            new: true,
+          }
+        );
+      }
+
+      // Update team rankings
+      const teams = await TeamDetail.find()
+        .select("_id points")
+        .sort({ points: -1 })
+        .lean();
+
+      // Process each team
+      for (let i = 0; i < teams.length; i++) {
+        const team = teams[i];
+
+        // Find or create leaderboard entry
+        await Leaderboard.findOneAndUpdate(
+          {
+            type: "team",
+            teamId: team._id,
+          },
+          {
+            points: team.points || 0,
+            rank: i + 1,
+            lastUpdated: new Date(),
+          },
+          {
+            upsert: true,
+            new: true,
+          }
+        );
+      }
+
+      // If silent=true, don't send a response (used when chained from other functions)
+      if (silent) return;
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            individualCount: individuals.length,
+            teamCount: teams.length,
+          },
+          "Leaderboard rankings updated successfully"
+        )
       );
+    } catch (error) {
+      console.error("Error updating leaderboard rankings:", error);
+
+      // If silent=true, don't send a response
+      if (silent) throw error;
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update leaderboard rankings",
+      });
     }
-
-    // Update team rankings
-    const teams = await TeamDetail.find()
-      .select("_id points")
-      .sort({ points: -1 })
-      .lean();
-
-    // Process each team
-    for (let i = 0; i < teams.length; i++) {
-      const team = teams[i];
-
-      // Find or create leaderboard entry
-      await Leaderboard.findOneAndUpdate(
-        {
-          type: "team",
-          teamId: team._id,
-        },
-        {
-          points: team.points || 0,
-          rank: i + 1,
-          lastUpdated: new Date(),
-        },
-        {
-          upsert: true,
-          new: true,
-        }
-      );
-    }
-
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          individualCount: individuals.length,
-          teamCount: teams.length,
-        },
-        "Leaderboard rankings updated successfully"
-      )
-    );
-  } catch (error) {
-    console.error("Error updating leaderboard rankings:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update leaderboard rankings",
-    });
   }
-});
+);
 
 /**
  * Get leaderboard filters (tech stacks, languages, tags)
@@ -336,3 +514,60 @@ export const updateLeaderboardSkills = asyncHandler(
     }
   }
 );
+
+/**
+ * Initialize leaderboard with existing users and teams
+ * Use this endpoint if leaderboard is empty but you have users
+ */
+export const initializeLeaderboard = asyncHandler(async (req, res) => {
+  try {
+    // First check if leaderboard already has data
+    const existingEntries = await Leaderboard.countDocuments().catch((err) => {
+      console.error("Error counting leaderboard entries:", err);
+      return 0;
+    });
+
+    // Allow initialization if leaderboard is empty or force param is true
+    const isAdmin = req.user && req.user.role === "admin";
+    const isEmpty = existingEntries === 0;
+    const forceInitialize = req.query.force === "true";
+
+    if (!isEmpty && !isAdmin && !forceInitialize) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can reinitialize non-empty leaderboards",
+      });
+    }
+
+    // Initialize leaderboard with data from existing users and teams
+    try {
+      const result = await initializeLeaderboardData();
+
+      // Update rankings after initialization
+      await updateLeaderboardRankings(req, res, true);
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(200, result, "Leaderboard initialized successfully")
+        );
+    } catch (initError) {
+      console.error("Error in initialization process:", initError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed during leaderboard initialization process",
+        error:
+          process.env.NODE_ENV === "development"
+            ? initError.message
+            : undefined,
+      });
+    }
+  } catch (error) {
+    console.error("Error initializing leaderboard:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to initialize leaderboard",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
