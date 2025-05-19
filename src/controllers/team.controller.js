@@ -8,6 +8,7 @@ import UserDetail from "../models/UserDetail.model.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
 import { errorHandler } from "../utils/error.js";
 import { updateTeamLeaderboard } from "../utils/leaderboardHelper.js";
+import UserInvite from "../models/userInvite.model.js";
 
 // Create a new team
 const createTeam = asyncHandler(async (req, res) => {
@@ -49,7 +50,6 @@ const createTeam = asyncHandler(async (req, res) => {
       ];
     }
   }
-
   // Parse other arrays
   const techStack = Array.isArray(req.body.techStack)
     ? req.body.techStack
@@ -94,6 +94,25 @@ const createTeam = asyncHandler(async (req, res) => {
 
   if (!team) {
     throw new ApiError(500, "Failed to create team");
+  }
+
+  // Invite User to the team
+
+  console.log(req.body.TeamMembers);
+
+  if (req.body.TeamMembers && req.body.TeamMembers.length > 0) {
+    req.body.TeamMembers.map(async (memberId) => {
+      const inviteUser = await UserInvite.create({
+        userId: memberId,
+        teamId: team._id,
+        message: "You have been invited to join a team",
+        status: "pending",
+      });
+
+      if (!inviteUser) {
+        throw new ApiError(500, "Failed to invite user");
+      }
+    });
   }
 
   // After creating the team
@@ -354,8 +373,7 @@ const removeTeamMember = asyncHandler(async (req, res) => {
   // check if user is a leader
   const isLeader = team.TeamMembers.some(
     (member) =>
-      member._id.toString() === memberId.toString() &&
-      member.role === "Leader"
+      member._id.toString() === memberId.toString() && member.role === "Leader"
   );
   if (isLeader) {
     throw new ApiError(400, "Cannot remove team leader");
@@ -376,15 +394,13 @@ const removeTeamMember = asyncHandler(async (req, res) => {
   let userId = null;
 
   // Remove member
-  team.TeamMembers = team.TeamMembers.filter(
-    (member) =>
-    {if (member._id.toString() === memberId) {
+  team.TeamMembers = team.TeamMembers.filter((member) => {
+    if (member._id.toString() === memberId) {
       userId = member.userId;
       return false;
     }
-      return true;
-    }
-  );
+    return true;
+  });
 
   console.log("userId", userId);
 
@@ -394,7 +410,8 @@ const removeTeamMember = asyncHandler(async (req, res) => {
       userId,
       { $unset: { teamId: null } },
       { new: true }
-    ).then((user) => {
+    )
+      .then((user) => {
         if (!user) {
           throw new ApiError(404, "User not found");
         }

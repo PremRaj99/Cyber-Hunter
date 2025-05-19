@@ -91,6 +91,7 @@ import supportRouter from "./routes/support.route.js"; // Import support routes
 import notificationRoutes from "./routes/notification.route.js"; // Add this to your existing route imports
 import leaderboardRoutes from "./routes/leaderboard.route.js"; // Add leaderboard routes
 import contactRoutes from "./routes/contact.route.js"; // Import contact routes
+import userInviteRoutes from "./routes/userInvite.route.js"; // Import user invite routes
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -116,6 +117,7 @@ app.use("/api/v1/support", supportRouter);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/leaderboard", leaderboardRoutes);
 app.use("/api/v1/contact", contactRoutes);
+app.use("/api/v1/user-invite", userInviteRoutes); // Add this line to include user invite routes
 
 // Apply device tracking after authentication middleware
 app.use(trackDevice);
