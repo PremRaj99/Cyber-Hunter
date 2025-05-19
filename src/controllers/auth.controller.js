@@ -122,6 +122,24 @@ export const login = async (req, res, next) => {
     }).select("-_id -userId");
 
     // Return the user data with tokens
+
+    const data = {
+      ...rest,
+      accessToken,
+      refreshToken,
+      name: userDetail?.name,
+      course: userDetail?.course,
+      session: userDetail?.session,
+      branch: userDetail?.branch,
+      profilePicture: userDetail?.profilePicture,
+      DOB: userDetail?.DOB,
+      phoneNumber: userDetail?.phoneNumber,
+      gender: userDetail.gender,
+      teamId: userDetail.teamId,
+      qId: userDetail.qId,
+      interest: userDetail.interestId.map((int) => int.content),
+      bio: individual?.description,
+    };
     return res
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
@@ -134,13 +152,7 @@ export const login = async (req, res, next) => {
         maxAge: 365 * 24 * 60 * 60 * 1000,
       })
       .status(200)
-      .json(
-        ApiResponse(
-          200,
-          { ...rest, accessToken, refreshToken },
-          "Login Successful"
-        )
-      );
+      .json(ApiResponse(200, data, "Login Successful"));
   } catch (error) {
     next(error);
   }
