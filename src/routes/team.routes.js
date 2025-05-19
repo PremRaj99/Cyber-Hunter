@@ -5,7 +5,7 @@ import {
   getAllTeams,
   getTeamById,
   updateTeam,
-  addTeamMember, // Now properly imported
+  addTeamMember, 
   removeTeamMember,
   updateTechStack,
   addTeamMessage,
@@ -57,6 +57,15 @@ router.delete("/:teamId", verifyJWT, deleteTeam);
 router.delete("/:teamId/members/:memberId", verifyJWT, removeTeamMember);
 // Route to get team members details
 router.get("/:teamId/members-detail", verifyJWT, getTeamWithMembers);
+// put route to add a team member
+router.put(
+  "/:teamId/members",
+  verifyJWT,
+  validateTeamId,
+  isTeamCreator,
+  hasAvailableSlots,
+  addTeamMember
+);
 
 // Team tech stack routes
 router.put("/:teamId/tech-stack", verifyJWT, updateTechStack);

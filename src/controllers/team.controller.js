@@ -14,11 +14,6 @@ const createTeam = asyncHandler(async (req, res) => {
   const { TeamName, TeamDescription } = req.body;
   console.log("Received team creation request:", req.body);
 
-  // Validate input
-  // if (!TeamName) {
-  //   throw new ApiError(400, "Team name is required");
-  // }
-
   // Check if the request body is being properly parsed
   console.log("Request body:", req.body);
   console.log("Team name:", TeamName);
@@ -356,6 +351,16 @@ const removeTeamMember = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Team not found");
   }
 
+  // check if user is a leader
+  const isLeader = team.TeamMembers.some(
+    (member) =>
+      member._id.toString() === memberId.toString() &&
+      member.role === "Leader"
+  );
+  if (isLeader) {
+    throw new ApiError(400, "Cannot remove team leader");
+  }
+
   // Only team creator can remove members
   if (team.TeamCreaterId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "You are not authorized to update this team");
@@ -366,11 +371,40 @@ const removeTeamMember = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cannot remove team creator");
   }
 
+  console.log("memberId", memberId);
+
+  let userId = null;
+
   // Remove member
   team.TeamMembers = team.TeamMembers.filter(
-    (member) => member.userId.toString() !== memberId
+    (member) =>
+    {if (member._id.toString() === memberId) {
+      userId = member.userId;
+      return false;
+    }
+      return true;
+    }
   );
 
+  console.log("userId", userId);
+
+  // Check if userId was found and set teamId to null
+  if (userId) {
+    await User.findByIdAndUpdate(
+      userId,
+      { $unset: { teamId: null } },
+      { new: true }
+    ).then((user) => {
+        if (!user) {
+          throw new ApiError(404, "User not found");
+        }
+        console.log("User teamId removed successfully");
+      })
+      .catch((error) => {
+        console.error("Error removing teamId from user:", error);
+        throw new ApiError(500, "Failed to remove teamId from user");
+      });
+  }
   await team.save();
 
   // Update user's team reference
