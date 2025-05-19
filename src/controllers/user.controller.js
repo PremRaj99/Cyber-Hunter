@@ -443,18 +443,37 @@ export const getCurrentUser = asyncHandler(async (req, res, next) => {
     }
 
     // Get user details - don't fail if not found
-    const userDetail = await UserDetail.findOne({ userId }).select("-__v");
+    const userDetail = await UserDetail.findOne({ userId }).populate(
+      "interestId",
+      "content -_id"
+    );
 
     // Get individual data if it exists
-    const individual = await Individual.findOne({ userId }).select("-__v");
+    const individual = await Individual.findOne({ userId }).select(
+      "-_id -userId -__v"
+    );
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
 
     // Combine the data
     const userData = {
       ...user.toObject(),
-      ...(userDetail ? userDetail.toObject() : {}),
-      name: user.name || (userDetail && userDetail.name) || "User", // Fixed syntax error here
-      bio: individual?.description || "",
-      individualId: individual?._id || null,
+      accessToken,
+      refreshToken,
+      name: userDetail.name,
+      course: userDetail.course,
+      session: userDetail.session,
+      branch: userDetail.branch,
+      profilePicture: userDetail.profilePicture,
+      DOB: userDetail.DOB,
+      phoneNumber: userDetail.phoneNumber,
+      gender: userDetail.gender,
+      teamId: userDetail.teamId,
+      qId: userDetail.qId,
+      interest: userDetail.interestId.map((int) => int.content),
+      bio: individual?.description,
     };
 
     return res
