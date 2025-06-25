@@ -114,6 +114,10 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/", (req, res) => {
+  res.json(new ApiResponse(200, null, "Welcome to the Cyber Hunter API!"));
+});
+
 // define routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/auth", githubAuthRoutes);
