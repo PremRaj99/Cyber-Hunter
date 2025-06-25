@@ -7,7 +7,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "build": "echo 'No build step required for Node.js'",
+    "vercel-build": "npm install"
   },
   "author": "Prem Raj",
   "license": "ISC",

@@ -27,9 +27,24 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 
 // CORS configuration
+const allowedOrigins = [
+  process.env.CORS_ORIGIN || "http://localhost:5173",
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  "https://your-vercel-domain.vercel.app" // Replace with your actual Vercel domain
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -38,10 +53,10 @@ app.use(
 
 // Add a special handler for OPTIONS preflight requests
 app.options("*", (req, res) => {
-  res.header(
-    "Access-Control-Allow-Origin",
-    process.env.CORS_ORIGIN || "http://localhost:5173"
-  );
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header(
     "Access-Control-Allow-Methods",
     "GET, POST, PATCH, PUT, DELETE, OPTIONS"
