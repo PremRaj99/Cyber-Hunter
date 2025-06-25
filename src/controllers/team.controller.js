@@ -7,7 +7,10 @@ import User from "../models/User.model.js";
 import UserDetail from "../models/UserDetail.model.js";
 import uploadOnCloudinary from "../utils/fileUpload.js";
 import { errorHandler } from "../utils/error.js";
-import { updateTeamLeaderboard } from "../utils/leaderboardHelper.js";
+import {
+  updateTeamLeaderboard,
+  registerTeamToLeaderboard,
+} from "../utils/leaderboardHelper.js";
 import UserInvite from "../models/userInvite.model.js";
 
 // Create a new team
@@ -95,6 +98,9 @@ const createTeam = asyncHandler(async (req, res) => {
   if (!team) {
     throw new ApiError(500, "Failed to create team");
   }
+
+  // Register the new team to the leaderboard
+  await registerTeamToLeaderboard(team._id, 0);
 
   // Invite User to the team
 
@@ -263,6 +269,9 @@ const updateTeam = asyncHandler(async (req, res) => {
   if (interests) team.interests = interests;
 
   await team.save();
+
+  // Ensure team is registered on leaderboard
+  await registerTeamToLeaderboard(teamId, team.points || 0);
 
   return res
     .status(200)

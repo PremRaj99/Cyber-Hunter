@@ -147,3 +147,67 @@ export const initializeLeaderboardData = async () => {
     throw error;
   }
 };
+
+/**
+ * Register a new user to the leaderboard
+ * This should be called whenever a new user is created
+ */
+export const registerUserToLeaderboard = async (userId, points = 0) => {
+  try {
+    // Check if user already exists in leaderboard
+    const existingEntry = await Leaderboard.findOne({
+      type: "individual",
+      userId,
+    });
+
+    if (existingEntry) {
+      return true; // User already registered
+    }
+
+    // Create new leaderboard entry for user
+    await Leaderboard.create({
+      type: "individual",
+      userId,
+      points,
+      lastUpdated: new Date(),
+    });
+
+    console.log(`User ${userId} registered to leaderboard successfully`);
+    return true;
+  } catch (error) {
+    console.error("Error registering user to leaderboard:", error);
+    return false;
+  }
+};
+
+/**
+ * Register a new team to the leaderboard
+ * This should be called whenever a new team is created
+ */
+export const registerTeamToLeaderboard = async (teamId, points = 0) => {
+  try {
+    // Check if team already exists in leaderboard
+    const existingEntry = await Leaderboard.findOne({
+      type: "team",
+      teamId,
+    });
+
+    if (existingEntry) {
+      return true; // Team already registered
+    }
+
+    // Create new leaderboard entry for team
+    await Leaderboard.create({
+      type: "team",
+      teamId,
+      points,
+      lastUpdated: new Date(),
+    });
+
+    console.log(`Team ${teamId} registered to leaderboard successfully`);
+    return true;
+  } catch (error) {
+    console.error("Error registering team to leaderboard:", error);
+    return false;
+  }
+};

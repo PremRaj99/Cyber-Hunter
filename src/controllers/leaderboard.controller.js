@@ -9,7 +9,11 @@ import Tag from "../models/Tag.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
-import { initializeLeaderboardData } from "../utils/leaderboardHelper.js";
+import {
+  initializeLeaderboardData,
+  registerUserToLeaderboard,
+  registerTeamToLeaderboard,
+} from "../utils/leaderboardHelper.js";
 
 /**
  * Get leaderboard data with filtering options
@@ -567,6 +571,84 @@ export const initializeLeaderboard = asyncHandler(async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to initialize leaderboard",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
+
+/**
+ * Refresh leaderboard by checking for missing entries
+ * This function finds users and teams that aren't in the leaderboard and adds them
+ */
+export const refreshLeaderboard = asyncHandler(async (req, res) => {
+  try {
+    // Step 1: Get all existing leaderboard user entries
+    const existingUserEntries = await Leaderboard.find({
+      type: "individual",
+    }).select("userId");
+    const existingUserIds = new Set(
+      existingUserEntries.map((entry) => entry.userId.toString())
+    );
+
+    // Step 2: Get all existing leaderboard team entries
+    const existingTeamEntries = await Leaderboard.find({
+      type: "team",
+    }).select("teamId");
+    const existingTeamIds = new Set(
+      existingTeamEntries.map((entry) => entry.teamId.toString())
+    );
+
+    // Step 3: Find all individuals and register missing ones
+    const individuals = await Individual.find().select("userId point");
+    console.log(`Found ${individuals.length} total individuals`);
+
+    let newUserCount = 0;
+    for (const individual of individuals) {
+      if (!individual.userId) continue;
+
+      if (!existingUserIds.has(individual.userId.toString())) {
+        await registerUserToLeaderboard(
+          individual.userId,
+          individual.point || 0
+        );
+        newUserCount++;
+      }
+    }
+
+    // Step 4: Find all teams and register missing ones
+    const teams = await TeamDetail.find().select("_id points");
+    console.log(`Found ${teams.length} total teams`);
+
+    let newTeamCount = 0;
+    for (const team of teams) {
+      if (!team._id) continue;
+
+      if (!existingTeamIds.has(team._id.toString())) {
+        await registerTeamToLeaderboard(team._id, team.points || 0);
+        newTeamCount++;
+      }
+    }
+
+    // Step 5: Update rankings to ensure proper order
+    await updateLeaderboardRankings(req, res, true);
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          registeredUsers: newUserCount,
+          registeredTeams: newTeamCount,
+          totalUsers: individuals.length,
+          totalTeams: teams.length,
+        },
+        "Leaderboard refreshed successfully"
+      )
+    );
+  } catch (error) {
+    console.error("Error refreshing leaderboard:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to refresh leaderboard",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
