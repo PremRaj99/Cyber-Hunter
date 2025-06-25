@@ -14,7 +14,7 @@
 
 node_modules
 dist
-build
+# build
 coverage
 .vscode
 .idea

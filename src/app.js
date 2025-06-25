@@ -26,31 +26,31 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// CORS configuration
-const allowedOrigins = [
-  process.env.CORS_ORIGIN || "http://localhost:5173",
-  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  "https://cyber-hunter-frontend.vercel.app", // Replace with your actual Vercel domain
-  "https://cyberhunter.club"
-].filter(Boolean);
+// // CORS configuration
+// const allowedOrigins = [
+//   process.env.CORS_ORIGIN || "http://localhost:5173",
+//   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+//   "https://cyber-hunter-frontend.vercel.app", // Replace with your actual Vercel domain
+//   "https://cyberhunter.club"
+// ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, etc.)
-      if (!origin) return callback(null, true);
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       // Allow requests with no origin (mobile apps, etc.)
+//       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      } else {
-        return callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+//       if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+//         return callback(null, true);
+//       } else {
+//         return callback(new Error('Not allowed by CORS'));
+//       }
+//     },
+//     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+//     credentials: true,
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//   })
+// );
 
 // Add a special handler for OPTIONS preflight requests
 app.options("*", (req, res) => {
@@ -115,9 +115,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/", (req, res) => {
-  res.json(new ApiResponse(200, "Cyber Hunter", "Welcome to the Cyber Hunter API!"));
-});
+// app.get("/", (req, res) => {
+//   res.json(new ApiResponse(200, "Cyber Hunter", "Welcome to the Cyber Hunter API!"));
+// });
 
 // define routes
 app.use("/api/v1/auth", authRoutes);
@@ -157,12 +157,15 @@ app.get("/api/v1/auth/github-status", (req, res) => {
 });
 
 // Serve static files from the React app
-app.use(express.static(path.join(__dirname, "../../client/dist")));
+app.use(express.static(path.join(__dirname, "../public/build")));
 
 // The "catchall" handler: for any request that doesn't
 // match one above, send back React's index.html file.
+
+console.log(__dirname)
+
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
+  res.sendFile(path.join(__dirname, "../public/build/index.html"));
 });
 
 // Improved error handler
