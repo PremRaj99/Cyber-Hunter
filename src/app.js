@@ -30,7 +30,8 @@ app.use(morgan("dev"));
 const allowedOrigins = [
   process.env.CORS_ORIGIN || "http://localhost:5173",
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  "https://your-vercel-domain.vercel.app" // Replace with your actual Vercel domain
+  "https://cyber-hunter-frontend.vercel.app", // Replace with your actual Vercel domain
+  "https://cyberhunter.club"
 ].filter(Boolean);
 
 app.use(
