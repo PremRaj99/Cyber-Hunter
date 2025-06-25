@@ -115,7 +115,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
-  res.json(new ApiResponse(200, null, "Welcome to the Cyber Hunter API!"));
+  res.json(new ApiResponse(200, "Cyber Hunter", "Welcome to the Cyber Hunter API!"));
 });
 
 // define routes
