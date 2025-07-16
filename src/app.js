@@ -21,6 +21,14 @@ dotenv.config();
 
 const app = express();
 
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
@@ -39,7 +47,7 @@ app.use(morgan("dev"));
 //     origin: function (origin, callback) {
 //       // Allow requests with no origin (mobile apps, etc.)
 //       if (!origin) return callback(null, true);
-      
+
 //       if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
 //         return callback(null, true);
 //       } else {
@@ -54,8 +62,11 @@ app.use(morgan("dev"));
 
 // Add a special handler for OPTIONS preflight requests
 app.options("*", (req, res) => {
-  const origin = req.get('Origin');
-  if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+  const origin = req.get("Origin");
+  if (
+    allowedOrigins.includes(origin) ||
+    process.env.NODE_ENV === "development"
+  ) {
     res.header("Access-Control-Allow-Origin", origin);
   }
   res.header(
@@ -157,15 +168,21 @@ app.get("/api/v1/auth/github-status", (req, res) => {
 });
 
 // Serve static files from the React app
-app.use(express.static(path.join(__dirname, "../public/build")));
+// app.use(express.static(path.join(__dirname, "../public/build")));
 
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
+// // The "catchall" handler: for any request that doesn't
+// // match one above, send back React's index.html file.
 
-console.log(__dirname)
+// console.log(__dirname);
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/build/index.html"));
+// app.get("*", (req, res) => {
+//   res.sendFile(path.join(__dirname, "../public/build/index.html"));
+// });
+
+app.use("/", (req, res) => {
+  res.status(200).json({
+    message: "API sahi h BSDK! Frontend check kr",
+  });
 });
 
 // Improved error handler
