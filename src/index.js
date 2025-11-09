@@ -21,7 +21,12 @@ const server = http.createServer(app);
 // Initialize Socket.IO with the server
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://cyber-hunter-frontend.vercel.app",
+      "https://cyberhunter.space",
+    ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
